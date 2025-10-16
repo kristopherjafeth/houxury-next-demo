@@ -4,6 +4,7 @@ import PropertyGrid, { Property } from "../components/PropertyGrid";
 
 type ApiResponse = {
   properties: Property[];
+  availableTypes?: string[];
 };
 
 type PropertyTypesResponse = {
@@ -19,7 +20,6 @@ const IndexPage: React.FC = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [, setTypesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const listingRef = useRef<HTMLDivElement>(null);
@@ -28,7 +28,6 @@ const IndexPage: React.FC = () => {
     let isMounted = true;
     const fetchPropertyTypes = async () => {
       try {
-        setTypesLoading(true);
         const response = await fetch("/api/property-types");
         if (!response.ok) {
           throw new Error("No se pudieron obtener los tipos de propiedad");
@@ -40,10 +39,6 @@ const IndexPage: React.FC = () => {
       } catch {
         if (isMounted) {
           setPropertyTypes([]);
-        }
-      } finally {
-        if (isMounted) {
-          setTypesLoading(false);
         }
       }
     };
@@ -78,9 +73,10 @@ const IndexPage: React.FC = () => {
       }
 
       const data: ApiResponse = await response.json();
-        console.log("Rendering IndexPage with properties:", data);
-
       setProperties(data.properties);
+      if (data.availableTypes?.length) {
+        setPropertyTypes(data.availableTypes);
+      }
 
       if (listingRef.current) {
         listingRef.current.scrollIntoView({
@@ -88,7 +84,7 @@ const IndexPage: React.FC = () => {
           block: "start",
         });
       }
-    } catch  {
+    } catch {
       setError("No se pudieron cargar las propiedades. Inténtalo más tarde.");
       setProperties([]);
     } finally {
@@ -142,7 +138,7 @@ const IndexPage: React.FC = () => {
       >
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            {hasSearched ? (
+            {hasSearched && (
               <>
                 <h2 className="text-3xl font-semibold text-neutral-900">
                   Resultados de búsqueda
@@ -154,9 +150,6 @@ const IndexPage: React.FC = () => {
                     : `Encontramos ${properties.length} propiedades disponibles`}
                 </p>
               </>
-            ) : (
-            <>
-            </>
             )}
           </div>
       
@@ -186,8 +179,9 @@ const IndexPage: React.FC = () => {
             </p>
           )
         ) : (
-         <>
-         </>
+          <p className="mx-auto max-w-6xl px-4 text-center text-sm text-neutral-500">
+            Usa el buscador para descubrir las propiedades exclusivas disponibles.
+          </p>
         )}
       </div>
     </main>

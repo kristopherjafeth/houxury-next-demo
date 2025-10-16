@@ -3,7 +3,7 @@ import { DEFAULT_PROPERTY_TYPES, DEFAULT_PROPERTY_VALUES } from '../data/propert
 
 const TOKEN_URL = 'https://accounts.zoho.eu/oauth/v2/token'
 const PROPERTIES_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Inmuebles'
-const PROPERTIES_FIELDS = 'Name,Record_Image'
+const PROPERTIES_FIELDS = 'Name,Record_Image,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location'
 const MAX_PROPERTIES = 12
 
 let cachedToken: { token: string; expiresAt: number } | null = null
@@ -87,22 +87,63 @@ const fetchPropertyPhoto = async (id: string, token: string) => {
   }
 }
 
-const mapRecordToProperty = async (
-  record: { id: string; Name?: string | null; Record_Image?: string | null },
-  token: string,
-): Promise<Property> => {
+type ZohoRecord = {
+  id: string
+  Name?: string | null
+  Record_Image?: string | null
+  location?: string | null
+  property_type?: string | null
+  price_night?: number | string | null
+  bathroom_quantity?: number | string | null
+  number_of_rooms?: number | string | null
+  square_meters?: number | string | null
+}
+
+const safeNumber = (value: ZohoRecord[keyof ZohoRecord]) => {
+  const numeric = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : null
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+const formatPricePerNight = (value: number | null) => {
+  if (value === null) return DEFAULT_PROPERTY_VALUES.pricePerNight
+  try {
+    const formatter = new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    })
+    return `${formatter.format(value)} / noche`
+  } catch  {
+    return `${value} / noche`
+  }
+}
+
+const mapRecordToProperty = async (record: ZohoRecord, token: string): Promise<Property> => {
   const title = record.Name?.trim() || 'Inmueble sin título'
   const imageUrl = record.Record_Image ? await fetchPropertyPhoto(record.id, token) : DEFAULT_PROPERTY_VALUES.imageUrl
+  const location = record.location?.trim() || DEFAULT_PROPERTY_VALUES.location
+  const propertyType = record.property_type?.trim() || DEFAULT_PROPERTY_TYPES[0]
+
+  const rawPriceNight = safeNumber(record.price_night)
+  const bathrooms = safeNumber(record.bathroom_quantity)
+  const rooms = safeNumber(record.number_of_rooms)
+  const squareMeters = safeNumber(record.square_meters)
+
+  const pricePerNight = formatPricePerNight(rawPriceNight)
+
 
   return {
     id: record.id,
     title,
-    location: DEFAULT_PROPERTY_VALUES.location,
-    pricePerNight: DEFAULT_PROPERTY_VALUES.pricePerNight,
-    type: DEFAULT_PROPERTY_TYPES[0],
+    location,
+    pricePerNight,
+    type: propertyType,
     imageUrl,
-    description: DEFAULT_PROPERTY_VALUES.description,
-    features: [...DEFAULT_PROPERTY_VALUES.features],
+  features: [...DEFAULT_PROPERTY_VALUES.features],
+    bathrooms,
+    rooms,
+    squareMeters,
+    rawPricePerNight: rawPriceNight,
   }
 }
 
@@ -119,11 +160,37 @@ export const fetchZohoProperties = async () => {
     throw new Error(`No se pudieron obtener los inmuebles: ${response.status} ${text}`)
   }
 
-  const payload: { data?: Array<{ id: string; Name?: string; Record_Image?: string | null }> } = await response.json()
+  const payload: { data?: ZohoRecord[] } = await response.json()
   const records = payload.data ?? []
   const limitedRecords = records.slice(0, MAX_PROPERTIES)
 
   const properties = await Promise.all(limitedRecords.map((record) => mapRecordToProperty(record, token)))
 
   return properties
+}
+
+export const fetchZohoPropertyTypes = async () => {
+  const token = await fetchAccessToken()
+  const response = await fetch(`${PROPERTIES_ENDPOINT}?fields=property_type`, {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`No se pudieron obtener los tipos de inmueble: ${response.status} ${text}`)
+  }
+
+  const payload: { data?: Array<{ property_type?: string | null }> } = await response.json()
+
+  const uniqueTypes = new Set<string>()
+  payload.data?.forEach((record) => {
+    const type = record.property_type?.trim()
+    if (type) {
+      uniqueTypes.add(type)
+    }
+  })
+
+  return uniqueTypes.size ? Array.from(uniqueTypes).sort() : DEFAULT_PROPERTY_TYPES
 }
