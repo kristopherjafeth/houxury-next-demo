@@ -34,6 +34,7 @@ const IndexPage: React.FC = () => {
         }
         const data: PropertyTypesResponse = await response.json();
         if (isMounted) {
+          console.log('[IndexPage] fetched property types:', data.propertyTypes);
           setPropertyTypes(data.propertyTypes);
         }
       } catch {
