@@ -29,6 +29,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, propertyTypes, onChange,
           <input
             type="date"
             value={filters.checkIn}
+            required
             onChange={(event) => onChange('checkIn', event.target.value)}
             className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
           />
@@ -39,6 +40,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, propertyTypes, onChange,
           <input
             type="date"
             value={filters.checkOut}
+            required
+            min={filters.checkIn || undefined}
             onChange={(event) => onChange('checkOut', event.target.value)}
             className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
           />

@@ -67,15 +67,20 @@ const IndexPage: React.FC = () => {
         ? `/api/properties?${query.toString()}`
         : "/api/properties";
       const response = await fetch(url);
+      const data: ApiResponse & { message?: string } = await response.json();
 
       if (!response.ok) {
-        throw new Error("No se pudieron cargar las propiedades");
+        throw new Error(data.message ?? "No se pudieron cargar las propiedades");
       }
 
-      const data: ApiResponse = await response.json();
       setProperties(data.properties);
       if (data.availableTypes?.length) {
         setPropertyTypes(data.availableTypes);
+        setFilters((prev) =>
+          prev.propertyType && !data.availableTypes?.includes(prev.propertyType)
+            ? { ...prev, propertyType: "" }
+            : prev,
+        );
       }
 
       if (listingRef.current) {
@@ -84,8 +89,12 @@ const IndexPage: React.FC = () => {
           block: "start",
         });
       }
-    } catch {
-      setError("No se pudieron cargar las propiedades. Inténtalo más tarde.");
+    } catch (fetchError) {
+      const message =
+        fetchError instanceof Error
+          ? fetchError.message
+          : "No se pudieron cargar las propiedades. Inténtalo más tarde.";
+      setError(message);
       setProperties([]);
     } finally {
       setLoading(false);
@@ -123,7 +132,18 @@ const IndexPage: React.FC = () => {
             propertyTypes={propertyTypes}
             loading={loading}
             onChange={(field, value) =>
-              setFilters((prev) => ({ ...prev, [field]: value }))
+              setFilters((prev) => {
+                if (field === "checkIn") {
+                  const nextCheckOut = prev.checkOut && value && prev.checkOut <= value ? "" : prev.checkOut;
+                  return { ...prev, checkIn: value, checkOut: nextCheckOut };
+                }
+
+                if (field === "checkOut") {
+                  return { ...prev, checkOut: value };
+                }
+
+                return { ...prev, [field]: value };
+              })
             }
             onSubmit={(currentFilters) => {
               fetchProperties(currentFilters);
@@ -172,7 +192,7 @@ const IndexPage: React.FC = () => {
             </div>
           ) : properties.length ? (
             <PropertyGrid properties={properties} />
-          ) : (
+          ) : error ? null : (
             <p className="mx-auto max-w-6xl px-4 text-center text-sm text-neutral-500">
               No encontramos propiedades que coincidan con tu búsqueda. Ajusta
               los filtros e inténtalo de nuevo.

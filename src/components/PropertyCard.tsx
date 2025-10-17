@@ -10,10 +10,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   location,
   pricePerNight,
   imageUrl,
+  description,
   features,
   bathrooms,
   rooms,
   squareMeters,
+  startOfAvailability,
+  endOfAvailability,
 }) => {
   const stats: Array<{ label: string; value: string | null }> = [
     { label: 'Habitaciones', value: rooms !== null ? `${rooms}` : null },
@@ -22,6 +25,29 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   ]
   const hasStats = stats.some((stat) => stat.value)
   const hasFeatures = features.length > 0
+
+  const formatDate = (value: string | null) => {
+    if (!value) return null
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return null
+    return new Intl.DateTimeFormat('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(parsed)
+  }
+
+  const startLabel = formatDate(startOfAvailability)
+  const endLabel = formatDate(endOfAvailability)
+
+  let availabilityLabel: string | null = null
+  if (startLabel && endLabel) {
+    availabilityLabel = `Disponible del ${startLabel} al ${endLabel}`
+  } else if (startLabel) {
+    availabilityLabel = `Disponible a partir del ${startLabel}`
+  } else if (endLabel) {
+    availabilityLabel = `Disponible hasta el ${endLabel}`
+  }
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
@@ -41,6 +67,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             <span>{location}</span>
           </div>
         </header>
+        {availabilityLabel && <p className="text-sm text-neutral-500">{availabilityLabel}</p>}
+        {description && <p className="text-sm text-neutral-600">{description}</p>}
         {hasStats && (
           <div className="grid grid-cols-2 gap-3 text-sm text-neutral-700 sm:grid-cols-3">
             {stats.map((stat) =>

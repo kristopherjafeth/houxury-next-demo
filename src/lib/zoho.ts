@@ -3,7 +3,8 @@ import { DEFAULT_PROPERTY_TYPES, DEFAULT_PROPERTY_VALUES } from '../data/propert
 
 const TOKEN_URL = 'https://accounts.zoho.eu/oauth/v2/token'
 const PROPERTIES_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Inmuebles'
-const PROPERTIES_FIELDS = 'Name,Record_Image,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location'
+// Include both camelCase and snake_case variants of availability fields because Zoho may return different names
+const PROPERTIES_FIELDS = 'Name,Record_Image,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features'
 const MAX_PROPERTIES = 12
 
 let cachedToken: { token: string; expiresAt: number } | null = null
@@ -97,9 +98,21 @@ type ZohoRecord = {
   bathroom_quantity?: number | string | null
   number_of_rooms?: number | string | null
   square_meters?: number | string | null
+  startOfAvailability?: string | null
+  endOfAvailability?: string | null
+  // possible alternative field names returned by Zoho
+  Start_of_Availability?: string | null
+  End_of_Availability?: string | null
+  start_of_availability?: string | null
+  end_of_availability?: string | null
+  features?: unknown
 }
 
 const safeNumber = (value: ZohoRecord[keyof ZohoRecord]) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
   const numeric = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : null
   return Number.isFinite(numeric) ? numeric : null
 }
@@ -131,6 +144,12 @@ const mapRecordToProperty = async (record: ZohoRecord, token: string): Promise<P
 
   const pricePerNight = formatPricePerNight(rawPriceNight)
 
+  const featureList = Array.isArray(record.features)
+    ? (record.features as unknown[])
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map((value) => value.trim())
+    : [...DEFAULT_PROPERTY_VALUES.features]
+
 
   return {
     id: record.id,
@@ -139,17 +158,65 @@ const mapRecordToProperty = async (record: ZohoRecord, token: string): Promise<P
     pricePerNight,
     type: propertyType,
     imageUrl,
-  features: [...DEFAULT_PROPERTY_VALUES.features],
+    description: DEFAULT_PROPERTY_VALUES.description,
+    features: featureList,
     bathrooms,
     rooms,
     squareMeters,
     rawPricePerNight: rawPriceNight,
+    // Resolve availability from multiple possible field names that Zoho may return
+    startOfAvailability:
+      (record as any).startOfAvailability ||
+      (record as any).Start_of_Availability ||
+      (record as any).start_of_availability ||
+      null,
+    endOfAvailability:
+      (record as any).endOfAvailability ||
+      (record as any).End_of_Availability ||
+      (record as any).end_of_availability ||
+      null,
   }
 }
 
-export const fetchZohoProperties = async () => {
+export type ZohoFilters = {
+  propertyType?: string | null
+  checkIn?: string | null
+  checkOut?: string | null
+}
+
+const buildCriteria = (filters?: ZohoFilters) => {
+  if (!filters) return ''
+  const parts: string[] = []
+
+  if (filters.propertyType) {
+    // Zoho criteria example: (property_type:equals:Apartamento)
+    parts.push(`(property_type:equals:${filters.propertyType})`)
+  }
+
+  // Dates in Zoho should be in yyyy-MM-dd format; assume inputs already are
+  if (filters.checkIn) {
+    // Zoho often stores date fields with underscores; prefer Start_of_Availability for criteria
+    // start <= checkIn
+    parts.push(`(Start_of_Availability:before_or_equal:${filters.checkIn})`)
+  }
+
+  if (filters.checkOut) {
+    // end >= checkOut
+    parts.push(`(End_of_Availability:after_or_equal:${filters.checkOut})`)
+  }
+
+  if (parts.length === 0) return ''
+  return parts.join(' and ')
+}
+
+export const fetchZohoProperties = async (filters?: ZohoFilters) => {
   const token = await fetchAccessToken()
-  const response = await fetch(`${PROPERTIES_ENDPOINT}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}`, {
+  const criteria = buildCriteria(filters)
+  const url = criteria
+    ? `${PROPERTIES_ENDPOINT}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}&criteria=${encodeURIComponent(criteria)}`
+    : `${PROPERTIES_ENDPOINT}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}`
+
+  const response = await fetch(url, {
     headers: {
       Authorization: `Zoho-oauthtoken ${token}`,
     },
@@ -162,12 +229,24 @@ export const fetchZohoProperties = async () => {
 
   const payload: { data?: ZohoRecord[] } = await response.json()
   const records = payload.data ?? []
+  // Debug: if any record lacks availability fields, log the raw payload to help mapping
+  try {
+    const anyMissing = records.some((r) => {
+      return !((r as any).startOfAvailability || (r as any).Start_of_Availability || (r as any).start_of_availability) || !((r as any).endOfAvailability || (r as any).End_of_Availability || (r as any).end_of_availability)
+    })
+    if (anyMissing) {
+      console.warn('Zoho raw records (some missing availability fields):', JSON.stringify(records, null, 2))
+    }
+  } catch (e) {
+    // ignore logging errors
+  }
   const limitedRecords = records.slice(0, MAX_PROPERTIES)
 
   const properties = await Promise.all(limitedRecords.map((record) => mapRecordToProperty(record, token)))
 
   return properties
 }
+
 
 export const fetchZohoPropertyTypes = async () => {
   const token = await fetchAccessToken()
