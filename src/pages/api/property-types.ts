@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { DEFAULT_PROPERTY_TYPES } from '../../data/properties'
+// import { DEFAULT_PROPERTY_TYPES } from '../../data/properties'
 import { fetchZohoPropertyTypes } from '../../lib/zoho'
 
 const handler = async (request: NextApiRequest, response: NextApiResponse) => {
