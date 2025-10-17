@@ -13,7 +13,6 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     return response.status(200).json({ propertyTypes: types })
   } catch (error) {
     console.error('[api/property-types]', error)
-    return response.status(200).json({ propertyTypes: DEFAULT_PROPERTY_TYPES })
   }
 }
 
