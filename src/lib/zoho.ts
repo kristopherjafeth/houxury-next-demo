@@ -106,6 +106,29 @@ type ZohoRecord = {
   start_of_availability?: string | null
   end_of_availability?: string | null
   features?: unknown
+  [key: string]: unknown
+}
+
+const getStringField = (record: ZohoRecord, ...keys: string[]): string | null => {
+  for (const k of keys) {
+    const v = record[k]
+    if (v === null || v === undefined) continue
+    if (typeof v === 'string') {
+      const trimmed = v.trim()
+      if (trimmed.length > 0) return trimmed
+    }
+    if (typeof v === 'number') {
+      return String(v)
+    }
+  }
+  return null
+}
+
+const hasAvailabilityFields = (record: ZohoRecord) => {
+  return (
+    !!getStringField(record, 'startOfAvailability', 'Start_of_Availability', 'start_of_availability') &&
+    !!getStringField(record, 'endOfAvailability', 'End_of_Availability', 'end_of_availability')
+  )
 }
 
 const safeNumber = (value: ZohoRecord[keyof ZohoRecord]) => {
@@ -165,16 +188,8 @@ const mapRecordToProperty = async (record: ZohoRecord, token: string): Promise<P
     squareMeters,
     rawPricePerNight: rawPriceNight,
     // Resolve availability from multiple possible field names that Zoho may return
-    startOfAvailability:
-      (record as any).startOfAvailability ||
-      (record as any).Start_of_Availability ||
-      (record as any).start_of_availability ||
-      null,
-    endOfAvailability:
-      (record as any).endOfAvailability ||
-      (record as any).End_of_Availability ||
-      (record as any).end_of_availability ||
-      null,
+    startOfAvailability: getStringField(record, 'startOfAvailability', 'Start_of_Availability', 'start_of_availability'),
+    endOfAvailability: getStringField(record, 'endOfAvailability', 'End_of_Availability', 'end_of_availability'),
   }
 }
 
@@ -231,13 +246,11 @@ export const fetchZohoProperties = async (filters?: ZohoFilters) => {
   const records = payload.data ?? []
   // Debug: if any record lacks availability fields, log the raw payload to help mapping
   try {
-    const anyMissing = records.some((r) => {
-      return !((r as any).startOfAvailability || (r as any).Start_of_Availability || (r as any).start_of_availability) || !((r as any).endOfAvailability || (r as any).End_of_Availability || (r as any).end_of_availability)
-    })
+    const anyMissing = records.some((r) => !hasAvailabilityFields(r))
     if (anyMissing) {
       console.warn('Zoho raw records (some missing availability fields):', JSON.stringify(records, null, 2))
     }
-  } catch (e) {
+  } catch {
     // ignore logging errors
   }
   const limitedRecords = records.slice(0, MAX_PROPERTIES)
