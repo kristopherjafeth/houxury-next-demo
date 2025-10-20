@@ -1,10 +1,12 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import React from 'react'
 import type { Property } from '../data/properties'
 
 type PropertyCardProps = Property
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
+  id,
   type,
   title,
   location,
@@ -91,12 +93,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           </ul>
         )}
         <div className="mt-auto">
-          <button
-            type="button"
+          <Link
+            href={`/propiedad/${encodeURIComponent(id)}`}
             className="inline-flex w-full items-center justify-center rounded-lg bg-[#b49a66] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9c8452] focus:outline-none focus:ring-2 focus:ring-[#e7d6ac]"
           >
             Ver propiedad
-          </button>
+          </Link>
         </div>
       </div>
     </article>

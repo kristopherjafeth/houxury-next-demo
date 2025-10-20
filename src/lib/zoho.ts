@@ -261,6 +261,32 @@ export const fetchZohoProperties = async (filters?: ZohoFilters) => {
   return properties
 }
 
+export const fetchZohoPropertyById = async (id: string) => {
+  const token = await fetchAccessToken()
+  const url = `${PROPERTIES_ENDPOINT}/${id}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}`
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`No se pudo obtener el inmueble ${id}: ${response.status} ${text}`)
+  }
+
+  const payload: { data?: ZohoRecord[] } = await response.json()
+  const record = payload.data?.[0]
+
+  if (!record) {
+    return null
+  }
+
+  const property = await mapRecordToProperty(record, token)
+  return property
+}
+
 
 export const fetchZohoPropertyTypes = async () => {
   const token = await fetchAccessToken()
