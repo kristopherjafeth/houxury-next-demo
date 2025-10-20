@@ -13,6 +13,10 @@ export type Property = {
   rawPricePerNight: number | null
   startOfAvailability: string | null
   endOfAvailability: string | null
+  availableDates?: string[]
+  unavailableDates?: string[]
+  availableNights?: number
+  isFullyAvailable?: boolean
 }
 
 export const DEFAULT_PROPERTY_TYPE = 'Apartamento'
@@ -33,4 +37,8 @@ export const DEFAULT_PROPERTY_VALUES = {
     'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1600&q=60',
   startOfAvailability: null,
   endOfAvailability: null,
+  availableDates: [] as string[],
+  unavailableDates: [] as string[],
+  availableNights: 0,
+  isFullyAvailable: true,
 }

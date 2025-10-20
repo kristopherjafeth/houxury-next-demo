@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { DEFAULT_PROPERTY_TYPES } from '../../data/properties'
 import type { Property } from '../../data/properties'
-import { fetchZohoProperties } from '../../lib/zoho'
+import type { Reservation } from '../../data/reservations'
+import { fetchZohoProperties, fetchZohoReservations } from '../../lib/zoho'
 
 const handler = async (request: NextApiRequest, response: NextApiResponse) => {
   if (request.method !== 'GET') {
@@ -22,9 +23,7 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
 
     const parseDateStrict = (value?: string | null) => {
       if (!value) return null
-      // Try common formats: yyyy-mm-dd or ISO
-      // If value looks like 'Oct 10, 2025' the Date constructor can parse it, but
-      // to avoid timezone pitfalls we normalize to UTC midnight when possible.
+
       const asIso = /^\d{4}-\d{2}-\d{2}$/.test(value)
       if (asIso) {
         const parts = value.split('-').map((p) => Number(p))
@@ -53,36 +52,162 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
       checkOut: checkOutString || null,
     })
 
+    const shouldCheckReservations = Boolean(checkInDate && checkOutDate)
+
+    let reservations: Reservation[] = []
+    if (shouldCheckReservations) {
+      try {
+        reservations = await fetchZohoReservations({
+          checkIn: checkInString || null,
+          checkOut: checkOutString || null,
+        })
+      } catch (reservationError) {
+        console.error('[api/properties] fetchZohoReservations', reservationError)
+      }
+    }
+
+    const reservationsByProperty = new Map<string, Reservation[]>()
+    if (shouldCheckReservations && reservations.length > 0) {
+      reservations.forEach((reservation) => {
+        if (!reservation.propertyId) return
+        if (!reservationsByProperty.has(reservation.propertyId)) {
+          reservationsByProperty.set(reservation.propertyId, [])
+        }
+        reservationsByProperty.get(reservation.propertyId)?.push(reservation)
+      })
+    }
+
+    const addUtcDays = (date: Date, amount: number) => {
+      const next = new Date(date.getTime())
+      next.setUTCDate(next.getUTCDate() + amount)
+      return next
+    }
+
+    const toIsoDate = (date: Date) => {
+      return date.toISOString().slice(0, 10)
+    }
+
+    const enumerateDateRange = (start: Date, end: Date) => {
+      const result: string[] = []
+      for (let cursor = new Date(start.getTime()); cursor < end; cursor = addUtcDays(cursor, 1)) {
+        result.push(toIsoDate(cursor))
+      }
+      return result
+    }
+
+    const availabilityMetadata = new Map<
+      string,
+      {
+        availableDates: string[]
+        unavailableDates: string[]
+        availableNights: number
+        isFullyAvailable: boolean
+      }
+    >()
+
+    const computeReservationMetadata = (property: Property) => {
+      if (!shouldCheckReservations || !checkInDate || !checkOutDate) {
+        return {
+          availableDates: [],
+          unavailableDates: [],
+          availableNights: 0,
+          isFullyAvailable: true,
+        }
+      }
+
+      const rangeStart = checkInDate
+      const rangeEnd = checkOutDate
+
+      const cached = availabilityMetadata.get(property.id)
+      if (cached) {
+        return cached
+      }
+
+      const propertyReservations = reservationsByProperty.get(property.id) ?? []
+      if (propertyReservations.length === 0) {
+        const fullRange = enumerateDateRange(rangeStart, rangeEnd)
+        const metadata = {
+          availableDates: fullRange,
+          unavailableDates: [],
+          availableNights: fullRange.length,
+          isFullyAvailable: true,
+        }
+        availabilityMetadata.set(property.id, metadata)
+        return metadata
+      }
+
+      const reservedDates = new Set<string>()
+      propertyReservations.forEach((reservation) => {
+        const reservationStart = parseDateStrict(reservation.checkIn)
+        const reservationEnd = parseDateStrict(reservation.checkOut)
+        if (!reservationStart || !reservationEnd) return
+
+        const overlapStart = reservationStart > rangeStart ? reservationStart : rangeStart
+        const overlapEnd = reservationEnd < rangeEnd ? reservationEnd : rangeEnd
+
+        if (overlapStart >= overlapEnd) return
+
+        const overlapDates = enumerateDateRange(overlapStart, overlapEnd)
+        overlapDates.forEach((isoDate) => reservedDates.add(isoDate))
+      })
+
+      const fullRangeDates = enumerateDateRange(rangeStart, rangeEnd)
+      const unavailableDates = fullRangeDates.filter((isoDate) => reservedDates.has(isoDate))
+      const availableDates = fullRangeDates.filter((isoDate) => !reservedDates.has(isoDate))
+
+      const metadata = {
+        availableDates,
+        unavailableDates,
+        availableNights: availableDates.length,
+        isFullyAvailable: unavailableDates.length === 0,
+      }
+
+      availabilityMetadata.set(property.id, metadata)
+      return metadata
+    }
+
     const isPropertyAvailable = (property: Property) => {
-      // If no dates provided, treat as available
       if (!checkInDate && !checkOutDate) return true
 
       const start = parseDateStrict(property.startOfAvailability)
       const end = parseDateStrict(property.endOfAvailability)
 
-      // If both start and end are present, the property must fully contain the requested range
       if (start && end && checkInDate && checkOutDate) {
-        return start.getTime() <= checkInDate.getTime() && end.getTime() >= checkOutDate.getTime()
+        if (start.getTime() > checkInDate.getTime() || end.getTime() < checkOutDate.getTime()) {
+          return false
+        }
+      } else if (start && checkInDate && start.getTime() > checkInDate.getTime()) {
+        return false
+      } else if (end && checkOutDate && end.getTime() < checkOutDate.getTime()) {
+        return false
       }
 
-      // If only start is present, ensure start <= checkIn (property starts on/before check-in)
-      if (start && checkInDate) {
-        return start.getTime() <= checkInDate.getTime()
+      if (!shouldCheckReservations || !checkInDate || !checkOutDate) {
+        return true
       }
 
-      // If only end is present, ensure end >= checkOut (property still available at check-out)
-      if (end && checkOutDate) {
-        return end.getTime() >= checkOutDate.getTime()
-      }
-
-      // No date constraints available on the property; assume available
-      return true
+      const metadata = computeReservationMetadata(property)
+      return metadata.isFullyAvailable
     }
 
     const dateFiltered = properties.filter(isPropertyAvailable)
 
+    const enrichedProperties =
+      shouldCheckReservations && checkInDate && checkOutDate
+        ? dateFiltered.map((property) => {
+            const metadata = computeReservationMetadata(property)
+            return {
+              ...property,
+              availableDates: metadata.availableDates,
+              unavailableDates: metadata.unavailableDates,
+              availableNights: metadata.availableNights,
+              isFullyAvailable: metadata.isFullyAvailable,
+            }
+          })
+        : dateFiltered
+
     const typeSet = new Set<string>()
-    dateFiltered.forEach((property) => {
+    properties.forEach((property) => {
       if (property.type) {
         typeSet.add(property.type)
       }
@@ -92,15 +217,11 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
 
     const filtered =
       propertyType && typeof propertyType === 'string' && propertyType.length > 0
-        ? dateFiltered.filter((property) => property.type === propertyType)
-        : dateFiltered
-
-    const responsePayload =
-      filtered.length === 0 && propertyType ? dateFiltered : filtered
-
+        ? enrichedProperties.filter((property) => property.type.trim().toLowerCase() === propertyType.trim().toLowerCase())
+        : enrichedProperties
 
     return response.status(200).json({
-      properties: responsePayload,
+      properties: filtered,
       availableTypes,
     })
   } catch (error) {

@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import FilterBar, { FilterState } from "../components/FilterBar";
 import PropertyGrid, { Property } from "../components/PropertyGrid";
+import { fetchReservations, ReservationFilters } from '../lib/api/reservationsClient';
+import { Reservation } from "@/data/reservations";
 
 type ApiResponse = {
   properties: Property[];
@@ -11,18 +13,21 @@ type PropertyTypesResponse = {
   propertyTypes: string[];
 };
 
+const INITIAL_FILTERS: FilterState = {
+  checkIn: "",
+  checkOut: "",
+  propertyType: "",
+};
+
 const IndexPage: React.FC = () => {
-  const [filters, setFilters] = useState<FilterState>({
-    checkIn: "",
-    checkOut: "",
-    propertyType: "",
-  });
+  const [filters, setFilters] = useState<FilterState>(() => ({ ...INITIAL_FILTERS }));
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const listingRef = useRef<HTMLDivElement>(null);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -102,6 +107,41 @@ const IndexPage: React.FC = () => {
     }
   };
 
+  const handleResetFilters = () => {
+    setFilters({ ...INITIAL_FILTERS });
+    setProperties([]);
+    setError(null);
+    setHasSearched(false);
+  };
+
+
+
+const fetchReservationsWithState = async (currentFilters: ReservationFilters) => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    const { reservations } = await fetchReservations(currentFilters);
+    setReservations(reservations);
+  } catch (fetchError) {
+    const message =
+      fetchError instanceof Error
+        ? fetchError.message
+        : 'No se pudieron cargar las reservaciones. Inténtalo más tarde.';
+    setError(message);
+    setReservations([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchReservationsWithState({});
+}, []);
+
+useEffect(() => {
+  console.log("Current reservations:", reservations);
+}, [reservations]);
 
   return (
     <main className="min-h-screen bg-neutral-100">
@@ -116,7 +156,7 @@ const IndexPage: React.FC = () => {
       >
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 flex w-full max-w-5xl flex-col items-center gap-10 px-4 text-center text-white">
-          <header className="max-w-3xl">
+          <header className="max-w-3xl pt-16">
             <p className="uppercase tracking-[0.35em] text-sm text-neutral-200 familiar-font">
               Experiencias exclusivas
             </p>
@@ -149,6 +189,7 @@ const IndexPage: React.FC = () => {
             onSubmit={(currentFilters) => {
               fetchProperties(currentFilters);
             }}
+            onReset={handleResetFilters}
           />
         </div>
       </section>
@@ -200,9 +241,8 @@ const IndexPage: React.FC = () => {
             </p>
           )
         ) : (
-          <p className="mx-auto max-w-6xl px-4 text-center text-sm text-neutral-500">
-            Usa el buscador para descubrir las propiedades exclusivas disponibles.
-          </p>
+       <>
+       </>
         )}
       </div>
     </main>

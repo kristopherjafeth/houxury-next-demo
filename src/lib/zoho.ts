@@ -1,11 +1,15 @@
 import type { Property } from '../data/properties'
 import { DEFAULT_PROPERTY_TYPES, DEFAULT_PROPERTY_VALUES } from '../data/properties'
+import type { Reservation } from '../data/reservations'
+import { DEFAULT_RESERVATION_VALUES } from '../data/reservations'
 
 const TOKEN_URL = 'https://accounts.zoho.eu/oauth/v2/token'
 const PROPERTIES_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Inmuebles'
-// Include both camelCase and snake_case variants of availability fields because Zoho may return different names
+const RESERVATIONS_ENDPOINT = `https://www.zohoapis.eu/crm/v8/${process.env.ZOHO_RESERVATIONS_MODULE ?? 'Reservaciones'}`
 const PROPERTIES_FIELDS = 'Name,Record_Image,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features'
+const RESERVATIONS_FIELDS = 'Check_in,Check_out,Connected_To__s,Email,Secondary_Email,Created_By,reservation_duration,status,Tag,reservation_date,Record_Image,property_reserved,Modified_By,Email_Opt_Out,Name,client_name,Owner,phone'
 const MAX_PROPERTIES = 12
+const MAX_RESERVATIONS = 50
 
 let cachedToken: { token: string; expiresAt: number } | null = null
 
@@ -100,7 +104,6 @@ type ZohoRecord = {
   square_meters?: number | string | null
   startOfAvailability?: string | null
   endOfAvailability?: string | null
-  // possible alternative field names returned by Zoho
   Start_of_Availability?: string | null
   End_of_Availability?: string | null
   start_of_availability?: string | null
@@ -109,7 +112,7 @@ type ZohoRecord = {
   [key: string]: unknown
 }
 
-const getStringField = (record: ZohoRecord, ...keys: string[]): string | null => {
+const getStringField = (record: Record<string, unknown>, ...keys: string[]): string | null => {
   for (const k of keys) {
     const v = record[k]
     if (v === null || v === undefined) continue
@@ -131,7 +134,7 @@ const hasAvailabilityFields = (record: ZohoRecord) => {
   )
 }
 
-const safeNumber = (value: ZohoRecord[keyof ZohoRecord]) => {
+const safeNumber = (value: unknown) => {
   if (value === null || value === undefined) {
     return null
   }
@@ -204,13 +207,11 @@ const buildCriteria = (filters?: ZohoFilters) => {
   const parts: string[] = []
 
   if (filters.propertyType) {
-    // Zoho criteria example: (property_type:equals:Apartamento)
+    // ejemplo: (property_type:equals:Apartamento)
     parts.push(`(property_type:equals:${filters.propertyType})`)
   }
 
-  // Dates in Zoho should be in yyyy-MM-dd format; assume inputs already are
   if (filters.checkIn) {
-    // Zoho often stores date fields with underscores; prefer Start_of_Availability for criteria
     // start <= checkIn
     parts.push(`(Start_of_Availability:before_or_equal:${filters.checkIn})`)
   }
@@ -285,4 +286,252 @@ export const fetchZohoPropertyTypes = async () => {
   })
 
   return uniqueTypes.size ? Array.from(uniqueTypes).sort() : DEFAULT_PROPERTY_TYPES
+}
+
+type ZohoReservationRecord = {
+  id: string
+  Name?: string | null
+  property_reserved?: unknown
+  Connected_To__s?: unknown
+  client_name?: string | null
+  Check_in?: string | null
+  Check_out?: string | null
+  status?: string | null
+  reservation_duration?: number | string | null
+  reservation_date?: string | null
+  Email?: string | null
+  Secondary_Email?: string | null
+  phone?: string | null
+  Tag?: unknown
+  Record_Image?: unknown
+  Created_By?: unknown
+  Modified_By?: unknown
+  Email_Opt_Out?: boolean | null
+  Owner?: unknown
+  [key: string]: unknown
+}
+
+type LookupValue = { id: string | null; name: string | null }
+
+const extractLookup = (value: unknown): LookupValue => {
+  if (Array.isArray(value) && value.length > 0) {
+    return extractLookup(value[0])
+  }
+
+  if (!value || typeof value !== 'object') {
+    return { id: null, name: null }
+  }
+
+  const candidate = value as Record<string, unknown>
+  const id = (() => {
+    const raw = candidate.id
+    if (typeof raw === 'string' && raw.trim().length > 0) {
+      return raw.trim()
+    }
+    return null
+  })()
+
+  const name = (() => {
+    const raw = candidate.name ?? candidate.Name
+    if (typeof raw === 'string' && raw.trim().length > 0) {
+      return raw.trim()
+    }
+    return null
+  })()
+
+  return { id, name }
+}
+
+const formatReservationAmount = (value: number | null) => {
+  if (value === null) return DEFAULT_RESERVATION_VALUES.formattedTotalPrice
+  try {
+    const formatter = new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    })
+    return formatter.format(value)
+  } catch  {
+    return `${value}`
+  }
+}
+
+const normalizeTags = (value: unknown) => {
+  if (!value) {
+    return [...DEFAULT_RESERVATION_VALUES.tags]
+  }
+
+  if (Array.isArray(value)) {
+    const tags = value
+      .map((entry) => {
+        if (typeof entry === 'string') {
+          const trimmed = entry.trim()
+          return trimmed.length > 0 ? trimmed : null
+        }
+        if (entry && typeof entry === 'object') {
+          const candidate = entry as Record<string, unknown>
+          const raw = (candidate.name ?? candidate.Name ?? candidate.tag ?? candidate.Tag) as string | undefined
+          if (raw) {
+            const trimmed = raw.trim()
+            return trimmed.length > 0 ? trimmed : null
+          }
+        }
+        return null
+      })
+      .filter((tag): tag is string => tag !== null)
+
+    return tags.length > 0 ? tags : [...DEFAULT_RESERVATION_VALUES.tags]
+  }
+
+  if (typeof value === 'string') {
+    const tags = value
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0)
+    return tags.length > 0 ? tags : [...DEFAULT_RESERVATION_VALUES.tags]
+  }
+
+  return [...DEFAULT_RESERVATION_VALUES.tags]
+}
+
+const normalizeImageValue = (value: unknown) => {
+  if (!value) {
+    return DEFAULT_RESERVATION_VALUES.imageUrl
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : DEFAULT_RESERVATION_VALUES.imageUrl
+  }
+
+  if (Array.isArray(value) && value.length > 0) {
+    return normalizeImageValue(value[0])
+  }
+
+  if (typeof value === 'object') {
+    const candidate = value as Record<string, unknown>
+    const raw = candidate.url ?? candidate.URL ?? candidate.download_url ?? candidate.downloadUrl
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim()
+      return trimmed.length > 0 ? trimmed : DEFAULT_RESERVATION_VALUES.imageUrl
+    }
+  }
+
+  return DEFAULT_RESERVATION_VALUES.imageUrl
+}
+
+const mapRecordToReservation = (record: ZohoReservationRecord): Reservation => {
+  const propertyLookup = extractLookup(record.property_reserved ?? record.Connected_To__s)
+  const ownerLookup = extractLookup(record.Owner)
+
+  const code = getStringField(record, 'Name') ?? DEFAULT_RESERVATION_VALUES.code
+  const propertyName = propertyLookup.name ?? DEFAULT_RESERVATION_VALUES.propertyName
+  const guestName = getStringField(record, 'client_name') ?? DEFAULT_RESERVATION_VALUES.guestName
+
+  const status = getStringField(record, 'status') ?? DEFAULT_RESERVATION_VALUES.status
+  const checkIn = getStringField(record, 'Check_in')
+  const checkOut = getStringField(record, 'Check_out')
+  const notes = null
+  const guestCount = null
+  const totalPrice = null
+  const formattedTotalPrice = formatReservationAmount(totalPrice)
+  const reservationDate = getStringField(record, 'reservation_date')
+  const email = getStringField(record, 'Email') ?? DEFAULT_RESERVATION_VALUES.email
+  const secondaryEmail = getStringField(record, 'Secondary_Email') ?? DEFAULT_RESERVATION_VALUES.secondaryEmail
+  const phone = getStringField(record, 'phone') ?? DEFAULT_RESERVATION_VALUES.phone
+  const reservationDuration = safeNumber(record.reservation_duration)
+  const tags = normalizeTags(record.Tag)
+  const imageUrl = normalizeImageValue(record.Record_Image)
+  const ownerName = ownerLookup.name ?? DEFAULT_RESERVATION_VALUES.ownerName
+
+  return {
+    id: record.id,
+    code,
+    propertyId: propertyLookup.id,
+    propertyName,
+    guestName,
+    checkIn,
+    checkOut,
+    status,
+    guestCount,
+    totalPrice,
+    formattedTotalPrice,
+    createdAt: reservationDate,
+    notes,
+    email,
+    secondaryEmail,
+    phone,
+    reservationDate,
+    reservationDuration,
+    ownerName,
+    tags,
+    imageUrl,
+  }
+}
+
+export type ZohoReservationFilters = {
+  status?: string | null
+  propertyId?: string | null
+  checkIn?: string | null
+  checkOut?: string | null
+}
+
+const buildReservationCriteria = (filters?: ZohoReservationFilters) => {
+  if (!filters) return ''
+  const parts: string[] = []
+
+  if (filters.status) {
+    parts.push(`(Status:equals:${filters.status})`)
+  }
+
+  if (filters.propertyId) {
+    parts.push(`(property_reserved.id:equals:${filters.propertyId})`)
+  }
+
+  if (filters.checkIn) {
+    parts.push(`(Check_out:after_or_equal:${filters.checkIn})`)
+  }
+
+  if (filters.checkOut) {
+    parts.push(`(Check_in:before_or_equal:${filters.checkOut})`)
+  }
+
+  if (parts.length === 0) return ''
+  return parts.join(' and ')
+}
+
+export const fetchZohoReservations = async (filters?: ZohoReservationFilters) => {
+  const token = await fetchAccessToken()
+  const criteria = buildReservationCriteria(filters)
+  const url = criteria
+    ? `${RESERVATIONS_ENDPOINT}?fields=${encodeURIComponent(RESERVATIONS_FIELDS)}&criteria=${encodeURIComponent(criteria)}`
+    : `${RESERVATIONS_ENDPOINT}?fields=${encodeURIComponent(RESERVATIONS_FIELDS)}`
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${token}`,
+    },
+  })
+
+  const rawBody = await response.text()
+
+  if (!response.ok) {
+    throw new Error(`No se pudieron obtener las reservaciones: ${response.status} ${rawBody}`)
+  }
+
+  if (!rawBody || rawBody.trim().length === 0) {
+    return []
+  }
+
+  let payload: { data?: ZohoReservationRecord[] }
+  try {
+    payload = JSON.parse(rawBody) as { data?: ZohoReservationRecord[] }
+  } catch (parseError) {
+    throw new Error(`No se pudieron interpretar las reservaciones de Zoho: ${(parseError as Error).message}`)
+  }
+
+  const records = payload.data ?? []
+  const limitedRecords = records.slice(0, MAX_RESERVATIONS)
+
+  return limitedRecords.map((record) => mapRecordToReservation(record))
 }

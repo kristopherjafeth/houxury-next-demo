@@ -82,7 +82,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           </div>
         )}
         {hasFeatures && (
-          <ul className="mt-auto flex flex-wrap gap-x-3 gap-y-2 text-sm text-neutral-700">
+          <ul className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-neutral-700">
             {features.map((feature) => (
               <li key={feature} className="rounded-full bg-neutral-100 px-3 py-1">
                 {feature}
@@ -90,6 +90,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             ))}
           </ul>
         )}
+        <div className="mt-auto">
+          <button
+            type="button"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-[#b49a66] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9c8452] focus:outline-none focus:ring-2 focus:ring-[#e7d6ac]"
+          >
+            Ver propiedad
+          </button>
+        </div>
       </div>
     </article>
   )
