@@ -78,6 +78,7 @@ const IndexPage: React.FC = () => {
       if (!response.ok) {
         throw new Error(data.message ?? "No se pudieron cargar las propiedades");
       }
+      console.log("[IndexPage] fetched properties:", data.properties);
 
       setProperties(data.properties);
       if (data.availableTypes?.length) {

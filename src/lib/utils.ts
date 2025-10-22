@@ -1,0 +1,1 @@
+export const WORDPRESS_BASE_URL_PUBLIC = process.env.NEXT_PUBLIC_WORDPRESS_BASE_URL || 'https://houxury.es';

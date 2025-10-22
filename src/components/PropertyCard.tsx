@@ -2,11 +2,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 import type { Property } from '../data/properties'
+import { WORDPRESS_BASE_URL_PUBLIC } from '@/lib/utils'
 
 type PropertyCardProps = Property
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
-  id,
   type,
   title,
   location,
@@ -19,6 +19,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   squareMeters,
   startOfAvailability,
   endOfAvailability,
+  slugWordpress
 }) => {
   const stats: Array<{ label: string; value: string | null }> = [
     { label: 'Habitaciones', value: rooms !== null ? `${rooms}` : null },
@@ -94,7 +95,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         )}
         <div className="mt-auto">
           <Link
-            href={`/propiedad/${encodeURIComponent(id)}`}
+            href={slugWordpress ? `${WORDPRESS_BASE_URL_PUBLIC}/propiedad/${slugWordpress}` : ' # '}
             className="inline-flex w-full items-center justify-center rounded-lg bg-[#b49a66] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9c8452] focus:outline-none focus:ring-2 focus:ring-[#e7d6ac]"
           >
             Ver propiedad

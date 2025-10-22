@@ -17,6 +17,7 @@ export type Property = {
   unavailableDates?: string[]
   availableNights?: number
   isFullyAvailable?: boolean
+  slugWordpress?: string | null
 }
 
 export const DEFAULT_PROPERTY_TYPE = 'Apartamento'
@@ -41,4 +42,5 @@ export const DEFAULT_PROPERTY_VALUES = {
   unavailableDates: [] as string[],
   availableNights: 0,
   isFullyAvailable: true,
+  slugWordpress: null,
 }

@@ -6,7 +6,7 @@ import { DEFAULT_RESERVATION_VALUES } from '../data/reservations'
 const TOKEN_URL = 'https://accounts.zoho.eu/oauth/v2/token'
 const PROPERTIES_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Inmuebles'
 const RESERVATIONS_ENDPOINT = `https://www.zohoapis.eu/crm/v8/${process.env.ZOHO_RESERVATIONS_MODULE ?? 'Reservaciones'}`
-const PROPERTIES_FIELDS = 'Name,Record_Image,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features'
+const PROPERTIES_FIELDS = 'Name,Record_Image,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features,slugwordpress'
 const RESERVATIONS_FIELDS = 'Check_in,Check_out,Connected_To__s,Email,Secondary_Email,Created_By,reservation_duration,status,Tag,reservation_date,Record_Image,property_reserved,Modified_By,Email_Opt_Out,Name,client_name,Owner,phone'
 const MAX_PROPERTIES = 12
 const MAX_RESERVATIONS = 50
@@ -108,6 +108,7 @@ type ZohoRecord = {
   End_of_Availability?: string | null
   start_of_availability?: string | null
   end_of_availability?: string | null
+  slugwordpress?: string | null
   features?: unknown
   [key: string]: unknown
 }
@@ -190,9 +191,9 @@ const mapRecordToProperty = async (record: ZohoRecord, token: string): Promise<P
     rooms,
     squareMeters,
     rawPricePerNight: rawPriceNight,
-    // Resolve availability from multiple possible field names that Zoho may return
     startOfAvailability: getStringField(record, 'startOfAvailability', 'Start_of_Availability', 'start_of_availability'),
     endOfAvailability: getStringField(record, 'endOfAvailability', 'End_of_Availability', 'end_of_availability'),
+    slugWordpress: record.slugwordpress
   }
 }
 
