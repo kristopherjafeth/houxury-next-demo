@@ -95,20 +95,21 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         )}
         <div className="mt-auto">
         <Link
-  href={
-    slugWordpress
-      ? `${WORDPRESS_BASE_URL_PUBLIC}/propiedad/${slugWordpress}`
-      : '#'
-  }
-  passHref
->
-  <a
-    target="_top"
-    className="inline-flex w-full items-center justify-center rounded-lg bg-[#b49a66] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9c8452] focus:outline-none focus:ring-2 focus:ring-[#e7d6ac]"
-  >
-    Ver propiedad
-  </a>
-</Link>
+          href={
+            slugWordpress
+              ? `${WORDPRESS_BASE_URL_PUBLIC}/propiedad/${slugWordpress}`
+              : '#'
+          }
+          passHref
+        >
+          <a
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-[#b49a66] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9c8452] focus:outline-none focus:ring-2 focus:ring-[#e7d6ac]"
+          >
+            Ver propiedad
+          </a>
+        </Link>
         </div>
       </div>
     </article>
