@@ -201,15 +201,22 @@ export type ZohoFilters = {
   propertyType?: string | null
   checkIn?: string | null
   checkOut?: string | null
+  location?: string | null
 }
 
 const buildCriteria = (filters?: ZohoFilters) => {
   if (!filters) return ''
   const parts: string[] = []
 
+
   if (filters.propertyType) {
     // ejemplo: (property_type:equals:Apartamento)
     parts.push(`(property_type:equals:${filters.propertyType})`)
+  }
+
+  if (filters.location) {
+    console.log('Filtering by location:', filters.location);
+    parts.push(`(location:equals:${filters.location})`)
   }
 
   if (filters.checkIn) {

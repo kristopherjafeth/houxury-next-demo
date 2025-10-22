@@ -11,9 +11,10 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
   }
 
   try {
-    const { propertyType, checkIn, checkOut } = request.query
-    const checkInString = Array.isArray(checkIn) ? checkIn[0] : checkIn
-    const checkOutString = Array.isArray(checkOut) ? checkOut[0] : checkOut
+  const { propertyType, checkIn, checkOut, location } = request.query
+  const checkInString = Array.isArray(checkIn) ? checkIn[0] : checkIn
+  const checkOutString = Array.isArray(checkOut) ? checkOut[0] : checkOut
+  const locationString = Array.isArray(location) ? location[0] : location
 
     const parseDate = (value?: string | null) => {
       if (!value) return null
@@ -50,6 +51,7 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
       propertyType: Array.isArray(propertyType) ? propertyType[0] : (propertyType as string | undefined),
       checkIn: checkInString || null,
       checkOut: checkOutString || null,
+      location: locationString || null,
     })
 
     const shouldCheckReservations = Boolean(checkInDate && checkOutDate)
@@ -215,10 +217,13 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
 
     const availableTypes = typeSet.size ? Array.from(typeSet).sort() : [...DEFAULT_PROPERTY_TYPES]
 
-    const filtered =
-      propertyType && typeof propertyType === 'string' && propertyType.length > 0
-        ? enrichedProperties.filter((property) => property.type.trim().toLowerCase() === propertyType.trim().toLowerCase())
-        : enrichedProperties
+    let filtered = enrichedProperties;
+    if (propertyType && typeof propertyType === 'string' && propertyType.length > 0) {
+      filtered = filtered.filter((property) => property.type.trim().toLowerCase() === propertyType.trim().toLowerCase());
+    }
+    if (locationString && typeof locationString === 'string' && locationString.length > 0) {
+      filtered = filtered.filter((property) => (property.location || '').trim().toLowerCase() === locationString.trim().toLowerCase());
+    }
 
     return response.status(200).json({
       properties: filtered,

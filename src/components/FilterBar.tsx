@@ -5,6 +5,7 @@ export type FilterState = {
   checkIn: string
   checkOut: string
   propertyType: string
+  location: string
 }
 
 type FilterBarProps = {
@@ -25,13 +26,13 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, propertyTypes, onChange,
       }}
       className="w-full rounded-xl bg-transparent p-4 "
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(3,minmax(0,1fr))_auto_auto] md:items-end">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(4,minmax(0,1fr))_auto_auto] md:items-end">
         <label className="flex flex-col text-sm font-medium text-[#b49a66]">
           Fecha de entrada
           <input
             type="date"
             value={filters.checkIn}
-            required
+            
             onChange={(event) => onChange('checkIn', event.target.value)}
             className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
           />
@@ -42,7 +43,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, propertyTypes, onChange,
           <input
             type="date"
             value={filters.checkOut}
-            required
+            
             min={filters.checkIn || undefined}
             onChange={(event) => onChange('checkOut', event.target.value)}
             className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
@@ -62,6 +63,19 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, propertyTypes, onChange,
                 {type}
               </option>
             ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col text-sm font-medium text-[#b49a66]">
+          Ubicación
+          <select
+            value={filters.location}
+            onChange={(event) => onChange('location', event.target.value)}
+            className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
+          >
+            <option value="">Todas</option>
+            <option value="Barcelona">Barcelona</option>
+            <option value="Madrid">Madrid</option>
           </select>
         </label>
 

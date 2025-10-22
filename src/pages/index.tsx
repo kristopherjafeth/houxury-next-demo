@@ -17,6 +17,7 @@ const INITIAL_FILTERS: FilterState = {
   checkIn: "",
   checkOut: "",
   propertyType: "",
+  location: "",
 };
 
 const IndexPage: React.FC = () => {
@@ -62,12 +63,15 @@ const IndexPage: React.FC = () => {
       setHasSearched(true);
 
       const query = new URLSearchParams();
+
       if (currentFilters.propertyType)
         query.append("propertyType", currentFilters.propertyType);
       if (currentFilters.checkIn)
         query.append("checkIn", currentFilters.checkIn);
       if (currentFilters.checkOut)
         query.append("checkOut", currentFilters.checkOut);
+      if (currentFilters.location)
+        query.append("location", currentFilters.location);
 
       const url = query.toString()
         ? `/api/properties?${query.toString()}`
@@ -148,27 +152,21 @@ useEffect(() => {
     <main className="min-h-screen bg-neutral-100">
       <section
         className="relative flex min-h-[60vh] items-center justify-center overflow-hidden"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(17,17,17,0.7), rgba(17,17,17,0.7)), url('https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=1600&q=80')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
       >
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover z-0"
+        >
+          <source src="https://www.houxury.es/wp-content/uploads/Houxury-Web-Intro-1-1.mp4" type="video/mp4" />
+        </video>
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 flex w-full max-w-5xl flex-col items-center gap-10 px-4 text-center text-white">
-          <header className="max-w-3xl pt-16">
-            <p className="uppercase tracking-[0.35em] text-sm text-neutral-200 familiar-font">
-              Experiencias exclusivas
-            </p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl familiar-font">
-              Encuentra la propiedad perfecta para tu próxima estadía
-            </h1>
-            <p className="mt-4 text-base text-neutral-200 sm:text-lg">
-              Selecciona tus fechas y el tipo de inmueble para descubrir
-              espacios que combinan lujo, privacidad y servicios personalizados.
-            </p>
-          </header>
+          <div className="h-64">
+          
+          </div>
           <FilterBar
             filters={filters}
             propertyTypes={propertyTypes}
