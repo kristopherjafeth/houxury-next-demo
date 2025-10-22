@@ -151,7 +151,7 @@ useEffect(() => {
   return (
     <main className="min-h-screen bg-neutral-100">
       <section
-        className="relative flex min-h-[60vh] lg:max-h-[600px] items-center justify-center overflow-hidden"
+        className="relative flex lg:h-[600px] lg:max-h-[600px] items-center justify-center overflow-hidden"
       >
         <video
           autoPlay
