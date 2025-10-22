@@ -122,7 +122,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               try {
                 target.location.href = url;
               } catch {
-                // If accessing top is blocked by cross-origin, fallback to current window
                 window.location.href = url;
               }
             }}
