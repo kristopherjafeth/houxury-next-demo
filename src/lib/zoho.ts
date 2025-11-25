@@ -6,7 +6,9 @@ import { DEFAULT_RESERVATION_VALUES } from '../data/reservations'
 const TOKEN_URL = 'https://accounts.zoho.eu/oauth/v2/token'
 const PROPERTIES_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Inmuebles'
 const RESERVATIONS_ENDPOINT = `https://www.zohoapis.eu/crm/v8/${process.env.ZOHO_RESERVATIONS_MODULE ?? 'Reservaciones'}`
-const PROPERTIES_FIELDS = 'Name,Record_Image,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features,slugwordpress'
+const ROOMS_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Habitaciones'
+const PROPERTIES_FIELDS = 'Name,Record_Image,Url_Workdrive,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features,slugwordpress'
+const ROOMS_FIELDS = 'Name,Record_Image,url_featured_image,Inmueble_Principal'
 const RESERVATIONS_FIELDS = 'Check_in,Check_out,Connected_To__s,Email,Secondary_Email,Created_By,reservation_duration,status,Tag,reservation_date,Record_Image,property_reserved,Modified_By,Email_Opt_Out,Name,client_name,Owner,phone'
 const MAX_PROPERTIES = 12
 const MAX_RESERVATIONS = 50
@@ -96,6 +98,7 @@ type ZohoRecord = {
   id: string
   Name?: string | null
   Record_Image?: string | null
+  Url_Workdrive?: string | null
   location?: string | null
   property_type?: string | null
   price_night?: number | string | null
@@ -158,12 +161,12 @@ const formatPricePerNight = (value: number | null) => {
   }
 }
 
-const mapRecordToProperty = async (record: ZohoRecord, token: string): Promise<Property> => {
+const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
   const title = record.Name?.trim() || 'Inmueble sin título'
-  const imageUrl = record.Record_Image ? await fetchPropertyPhoto(record.id, token) : DEFAULT_PROPERTY_VALUES.imageUrl
+  const imageUrl = record.Url_Workdrive ? record.Url_Workdrive  : DEFAULT_PROPERTY_VALUES.imageUrl
   const location = record.location?.trim() || DEFAULT_PROPERTY_VALUES.location
   const propertyType = record.property_type?.trim() || DEFAULT_PROPERTY_TYPES[0]
-
+  console.log('Mapping Zoho record to Property:', record.id, record.Url_Workdrive, propertyType);
   const rawPriceNight = safeNumber(record.price_night)
   const bathrooms = safeNumber(record.bathroom_quantity)
   const rooms = safeNumber(record.number_of_rooms)
@@ -264,7 +267,7 @@ export const fetchZohoProperties = async (filters?: ZohoFilters) => {
   }
   const limitedRecords = records.slice(0, MAX_PROPERTIES)
 
-  const properties = await Promise.all(limitedRecords.map((record) => mapRecordToProperty(record, token)))
+  const properties = await Promise.all(limitedRecords.map((record) => mapRecordToProperty(record)))
 
   return properties
 }
@@ -450,7 +453,7 @@ const mapRecordToReservation = (record: ZohoReservationRecord): Reservation => {
   const phone = getStringField(record, 'phone') ?? DEFAULT_RESERVATION_VALUES.phone
   const reservationDuration = safeNumber(record.reservation_duration)
   const tags = normalizeTags(record.Tag)
-  const imageUrl = normalizeImageValue(record.Record_Image)
+  const imageUrl = normalizeImageValue(record.Url_Workdrive)
   const ownerName = ownerLookup.name ?? DEFAULT_RESERVATION_VALUES.ownerName
 
   return {
@@ -543,4 +546,98 @@ export const fetchZohoReservations = async (filters?: ZohoReservationFilters) =>
   const limitedRecords = records.slice(0, MAX_RESERVATIONS)
 
   return limitedRecords.map((record) => mapRecordToReservation(record))
+}
+
+export type ZohoRoom = {
+  id: string
+  name: string
+  imageUrl: string
+  propertyId: string | null
+  propertyName: string | null
+  pricePerNight: string
+  bathrooms: number | null
+  squareMeters: number | null
+  features: string[]
+  description: string
+}
+
+const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
+  const name = record.Name?.trim() || 'Habitación sin nombre'
+  const imageUrl = record.url_featured_image ? String(record.url_featured_image) : DEFAULT_PROPERTY_VALUES.imageUrl
+  
+  const propertyLookup = extractLookup(record.Inmueble_Principal)
+  
+  const rawPriceNight = safeNumber(record.price_night)
+  const bathrooms = safeNumber(record.bathroom_quantity)
+  const squareMeters = safeNumber(record.square_meters)
+  
+  const pricePerNight = formatPricePerNight(rawPriceNight)
+  
+  const featureList = Array.isArray(record.features)
+    ? (record.features as unknown[])
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map((value) => value.trim())
+    : []
+
+  const description = typeof record.description === 'string' ? record.description : ''
+
+  return {
+    id: record.id,
+    name,
+    imageUrl,
+    propertyId: propertyLookup.id,
+    propertyName: propertyLookup.name,
+    pricePerNight,
+    bathrooms,
+    squareMeters,
+    features: featureList,
+    description
+  }
+}
+
+export type ZohoRoomFilters = {
+  propertyId?: string | null
+}
+
+const buildRoomCriteria = (filters?: ZohoRoomFilters) => {
+  if (!filters) return ''
+  const parts: string[] = []
+
+  if (filters.propertyId) {
+    parts.push(`(Inmueble_Principal.id:equals:${filters.propertyId})`)
+  }
+
+  if (parts.length === 0) return ''
+  return parts.join(' and ')
+}
+
+export const fetchZohoRooms = async (filters?: ZohoRoomFilters) => {
+  const token = await fetchAccessToken()
+  const criteria = buildRoomCriteria(filters)
+  const url = criteria
+    ? `${ROOMS_ENDPOINT}?fields=${encodeURIComponent(ROOMS_FIELDS)}&criteria=${encodeURIComponent(criteria)}`
+    : `${ROOMS_ENDPOINT}?fields=${encodeURIComponent(ROOMS_FIELDS)}`
+
+
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${token}`,
+    },
+  })
+    console.log('response', response);
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`No se pudieron obtener las habitaciones: ${response.status} ${text}`)
+  }
+
+
+
+  const payload: { data?: ZohoRecord[] } = await response.json()
+  const records = payload.data ?? []
+  
+  console.log('payload', payload.data);
+
+  return records.map(mapRecordToRoom)
 }

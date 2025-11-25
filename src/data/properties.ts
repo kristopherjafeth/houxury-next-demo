@@ -35,7 +35,7 @@ export const DEFAULT_PROPERTY_VALUES = {
   squareMeters: null,
   rawPricePerNight: null,
   imageUrl:
-    'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1600&q=60',
+    '/placeholder.png',
   startOfAvailability: null,
   endOfAvailability: null,
   availableDates: [] as string[],

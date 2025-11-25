@@ -1,8 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import React from "react";
 import type { Property } from "../data/properties";
-import { WORDPRESS_BASE_URL_PUBLIC } from "@/lib/utils";
 
 type PropertyCardProps = Property;
 
