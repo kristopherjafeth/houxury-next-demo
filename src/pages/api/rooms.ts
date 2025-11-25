@@ -8,14 +8,14 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
   }
 
   try {
-    const { propertyId } = request.query
+    const { propertyId, slug } = request.query
     const propertyIdString = Array.isArray(propertyId) ? propertyId[0] : propertyId
-
+    const slugString = Array.isArray(slug) ? slug[0] : slug
 
     const rooms = await fetchZohoRooms({
       propertyId: propertyIdString || null,
+      propertySlug: slugString || null,
     })
-
 
     // Filter rooms to only include those with a propertyId that matches the query parameter
     const filteredRooms = rooms.filter(room => {
@@ -26,8 +26,13 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
       if (propertyIdString) {
         return room.propertyId === propertyIdString
       }
+
+      // If slug query param is provided, only include matching rooms
+      if (slugString) {
+        return room.propertySlug === slugString
+      }
       
-      // If no propertyId query param, include all rooms with a propertyId
+      // If no propertyId or slug query param, include all rooms with a propertyId
       return true
     })
 

@@ -8,7 +8,7 @@ const PROPERTIES_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Inmuebles'
 const RESERVATIONS_ENDPOINT = `https://www.zohoapis.eu/crm/v8/${process.env.ZOHO_RESERVATIONS_MODULE ?? 'Reservaciones'}`
 const ROOMS_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Habitaciones'
 const PROPERTIES_FIELDS = 'Name,Record_Image,Url_Workdrive,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features,slugwordpress'
-const ROOMS_FIELDS = 'Name,Record_Image,url_featured_image,Inmueble_Principal'
+const ROOMS_FIELDS = 'Name,Record_Image,url_featured_image,Inmueble_Principal,slugwordpress'
 const RESERVATIONS_FIELDS = 'Check_in,Check_out,Connected_To__s,Email,Secondary_Email,Created_By,reservation_duration,status,Tag,reservation_date,Record_Image,property_reserved,Modified_By,Email_Opt_Out,Name,client_name,Owner,phone'
 const MAX_PROPERTIES = 12
 const MAX_RESERVATIONS = 50
@@ -166,7 +166,6 @@ const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
   const imageUrl = record.Url_Workdrive ? record.Url_Workdrive  : DEFAULT_PROPERTY_VALUES.imageUrl
   const location = record.location?.trim() || DEFAULT_PROPERTY_VALUES.location
   const propertyType = record.property_type?.trim() || DEFAULT_PROPERTY_TYPES[0]
-  console.log('Mapping Zoho record to Property:', record.id, record.Url_Workdrive, propertyType);
   const rawPriceNight = safeNumber(record.price_night)
   const bathrooms = safeNumber(record.bathroom_quantity)
   const rooms = safeNumber(record.number_of_rooms)
@@ -180,7 +179,7 @@ const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
         .map((value) => value.trim())
     : [...DEFAULT_PROPERTY_VALUES.features]
 
-
+  console.log("record", record);
   return {
     id: record.id,
     title,
@@ -218,7 +217,6 @@ const buildCriteria = (filters?: ZohoFilters) => {
   }
 
   if (filters.location) {
-    console.log('Filtering by location:', filters.location);
     parts.push(`(location:equals:${filters.location})`)
   }
 
@@ -554,6 +552,7 @@ export type ZohoRoom = {
   imageUrl: string
   propertyId: string | null
   propertyName: string | null
+  propertySlug: string | null
   pricePerNight: string
   bathrooms: number | null
   squareMeters: number | null
@@ -566,6 +565,7 @@ const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
   const imageUrl = record.url_featured_image ? String(record.url_featured_image) : DEFAULT_PROPERTY_VALUES.imageUrl
   
   const propertyLookup = extractLookup(record.Inmueble_Principal)
+  const propertySlug = getStringField(record, 'slugwordpress')
   
   const rawPriceNight = safeNumber(record.price_night)
   const bathrooms = safeNumber(record.bathroom_quantity)
@@ -587,6 +587,7 @@ const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
     imageUrl,
     propertyId: propertyLookup.id,
     propertyName: propertyLookup.name,
+    propertySlug,
     pricePerNight,
     bathrooms,
     squareMeters,
@@ -597,6 +598,7 @@ const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
 
 export type ZohoRoomFilters = {
   propertyId?: string | null
+  propertySlug?: string | null
 }
 
 const buildRoomCriteria = (filters?: ZohoRoomFilters) => {
@@ -605,6 +607,10 @@ const buildRoomCriteria = (filters?: ZohoRoomFilters) => {
 
   if (filters.propertyId) {
     parts.push(`(Inmueble_Principal.id:equals:${filters.propertyId})`)
+  }
+
+  if (filters.propertySlug) {
+    parts.push(`(Inmueble_Principal.slugwordpress:equals:${filters.propertySlug})`)
   }
 
   if (parts.length === 0) return ''
@@ -625,7 +631,6 @@ export const fetchZohoRooms = async (filters?: ZohoRoomFilters) => {
       Authorization: `Zoho-oauthtoken ${token}`,
     },
   })
-    console.log('response', response);
 
   if (!response.ok) {
     const text = await response.text()
@@ -637,7 +642,6 @@ export const fetchZohoRooms = async (filters?: ZohoRoomFilters) => {
   const payload: { data?: ZohoRecord[] } = await response.json()
   const records = payload.data ?? []
   
-  console.log('payload', payload.data);
 
   return records.map(mapRecordToRoom)
 }

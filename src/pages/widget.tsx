@@ -6,7 +6,7 @@ import RoomCard from '../components/RoomCard'
 
 export default function WidgetPage() {
   const router = useRouter()
-  const { propertyId } = router.query
+  const { propertyId, slug } = router.query
   
   const [rooms, setRooms] = useState<ZohoRoom[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,6 +23,9 @@ export default function WidgetPage() {
         if (propertyId) {
           params.append('propertyId', Array.isArray(propertyId) ? propertyId[0] : propertyId)
         }
+        if (slug) {
+          params.append('slug', Array.isArray(slug) ? slug[0] : slug)
+        }
 
         const res = await fetch(`/api/rooms?${params.toString()}`)
         if (!res.ok) {
@@ -38,10 +41,10 @@ export default function WidgetPage() {
     }
 
     fetchRooms()
-  }, [router.isReady, propertyId])
+  }, [router.isReady, propertyId, slug])
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-4 sm:p-8">
+    <div className="min-h-screen bg-white p-4 sm:p-8">
       <Head>
         <title>Habitaciones Disponibles</title>
       </Head>

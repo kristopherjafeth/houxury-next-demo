@@ -40,7 +40,6 @@ const IndexPage: React.FC = () => {
         }
         const data: PropertyTypesResponse = await response.json();
         if (isMounted) {
-          console.log('[IndexPage] fetched property types:', data.propertyTypes);
           setPropertyTypes(data.propertyTypes);
         }
       } catch {
@@ -82,7 +81,6 @@ const IndexPage: React.FC = () => {
       if (!response.ok) {
         throw new Error(data.message ?? "No se pudieron cargar las propiedades");
       }
-      console.log("[IndexPage] fetched properties:", data.properties);
 
       setProperties(data.properties);
       if (data.availableTypes?.length) {
@@ -145,8 +143,10 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  console.log("Current reservations:", reservations);
 }, [reservations]);
+
+
+console.log("properties", properties);
 
   return (
     <main className="min-h-screen bg-neutral-100">
@@ -160,7 +160,7 @@ useEffect(() => {
           playsInline
           className="absolute inset-0 w-full h-full object-cover z-0"
         >
-          <source src="https://www.houxury.es/wp-content/uploads/Houxury-Web-Intro-1-1.mp4" type="video/mp4" />
+          <source src="/intro.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 flex w-full max-w-5xl flex-col items-center gap-10 px-4 text-center text-white">
