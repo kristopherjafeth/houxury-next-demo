@@ -7,7 +7,7 @@ const TOKEN_URL = 'https://accounts.zoho.eu/oauth/v2/token'
 const PROPERTIES_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Inmuebles'
 const RESERVATIONS_ENDPOINT = `https://www.zohoapis.eu/crm/v8/${process.env.ZOHO_RESERVATIONS_MODULE ?? 'Reservaciones'}`
 const ROOMS_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Habitaciones'
-const PROPERTIES_FIELDS = 'Name,Record_Image,Url_Workdrive,property_type,price_night,bathroom_quantity,number_of_rooms,square_meters,location,startOfAvailability,endOfAvailability,Start_of_Availability,End_of_Availability,start_of_availability,end_of_availability,features,slugwordpress'
+const PROPERTIES_FIELDS = 'Name,url_featured_image,slugwordpress,number_of_rooms,bathroom_quantity'
 const ROOMS_FIELDS = 'Name,Record_Image,url_featured_image,Inmueble_Principal,slugwordpress'
 const RESERVATIONS_FIELDS = 'Check_in,Check_out,Connected_To__s,Email,Secondary_Email,Created_By,reservation_duration,status,Tag,reservation_date,Record_Image,property_reserved,Modified_By,Email_Opt_Out,Name,client_name,Owner,phone'
 const MAX_PROPERTIES = 12
@@ -163,7 +163,7 @@ const formatPricePerNight = (value: number | null) => {
 
 const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
   const title = record.Name?.trim() || 'Inmueble sin título'
-  const imageUrl = record.Url_Workdrive ? record.Url_Workdrive  : DEFAULT_PROPERTY_VALUES.imageUrl
+  const imageUrl = record.url_featured_image || DEFAULT_PROPERTY_VALUES.imageUrl
   const location = record.location?.trim() || DEFAULT_PROPERTY_VALUES.location
   const propertyType = record.property_type?.trim() || DEFAULT_PROPERTY_TYPES[0]
   const rawPriceNight = safeNumber(record.price_night)
@@ -179,7 +179,6 @@ const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
         .map((value) => value.trim())
     : [...DEFAULT_PROPERTY_VALUES.features]
 
-  console.log("record", record);
   return {
     id: record.id,
     title,
@@ -236,7 +235,8 @@ const buildCriteria = (filters?: ZohoFilters) => {
 
 export const fetchZohoProperties = async (filters?: ZohoFilters) => {
   const token = await fetchAccessToken()
-  const criteria = buildCriteria(filters)
+  // const criteria = buildCriteria(filters);
+  const criteria = null;
   const url = criteria
     ? `${PROPERTIES_ENDPOINT}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}&criteria=${encodeURIComponent(criteria)}`
     : `${PROPERTIES_ENDPOINT}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}`
@@ -254,18 +254,16 @@ export const fetchZohoProperties = async (filters?: ZohoFilters) => {
 
   const payload: { data?: ZohoRecord[] } = await response.json()
   const records = payload.data ?? []
-  // Debug: if any record lacks availability fields, log the raw payload to help mapping
-  try {
-    const anyMissing = records.some((r) => !hasAvailabilityFields(r))
-    if (anyMissing) {
-      console.warn('Zoho raw records (some missing availability fields):', JSON.stringify(records, null, 2))
-    }
-  } catch {
-    // ignore logging errors
+  
+  if (records.length > 0) {
+    console.log("\n=== ZOHO API DEBUG ===");
+    console.log("Campos solicitados:", PROPERTIES_FIELDS);
+    console.log("\nCampos recibidos en el primer record:", Object.keys(records[0]).join(", "));
+    console.log("\nPrimer record completo:", JSON.stringify(records[0], null, 2));
+    console.log("=== FIN DEBUG ===\n");
   }
-  const limitedRecords = records.slice(0, MAX_PROPERTIES)
 
-  const properties = await Promise.all(limitedRecords.map((record) => mapRecordToProperty(record)))
+  const properties = await Promise.all(records.map((record) => mapRecordToProperty(record)))
 
   return properties
 }
@@ -453,6 +451,7 @@ const mapRecordToReservation = (record: ZohoReservationRecord): Reservation => {
   const tags = normalizeTags(record.Tag)
   const imageUrl = normalizeImageValue(record.Url_Workdrive)
   const ownerName = ownerLookup.name ?? DEFAULT_RESERVATION_VALUES.ownerName
+
 
   return {
     id: record.id,
