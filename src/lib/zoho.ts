@@ -10,7 +10,6 @@ const ROOMS_ENDPOINT = 'https://www.zohoapis.eu/crm/v8/Habitaciones'
 const PROPERTIES_FIELDS = 'Name,url_featured_image,slugwordpress,number_of_rooms,bathroom_quantity'
 const ROOMS_FIELDS = 'Name,Record_Image,url_featured_image,Inmueble_Principal,slugwordpress'
 const RESERVATIONS_FIELDS = 'Check_in,Check_out,Connected_To__s,Email,Secondary_Email,Created_By,reservation_duration,status,Tag,reservation_date,Record_Image,property_reserved,Modified_By,Email_Opt_Out,Name,client_name,Owner,phone'
-const MAX_PROPERTIES = 12
 const MAX_RESERVATIONS = 50
 
 let cachedToken: { token: string; expiresAt: number } | null = null
@@ -68,37 +67,13 @@ const fetchAccessToken = async () => {
   return data.access_token
 }
 
-const fetchPropertyPhoto = async (id: string, token: string) => {
-  try {
-    const response = await fetch(`${PROPERTIES_ENDPOINT}/${id}/photo`, {
-      headers: {
-        Authorization: `Zoho-oauthtoken ${token}`,
-      },
-    })
-
-    if (!response.ok) {
-      return DEFAULT_PROPERTY_VALUES.imageUrl
-    }
-
-    const contentType = response.headers.get('content-type') ?? 'image/jpeg'
-    const arrayBuffer = await response.arrayBuffer()
-
-    if (!arrayBuffer.byteLength) {
-      return DEFAULT_PROPERTY_VALUES.imageUrl
-    }
-
-    const base64Image = Buffer.from(arrayBuffer).toString('base64')
-    return `data:${contentType};base64,${base64Image}`
-  } catch  {
-    return DEFAULT_PROPERTY_VALUES.imageUrl
-  }
-}
 
 type ZohoRecord = {
   id: string
   Name?: string | null
   Record_Image?: string | null
   Url_Workdrive?: string | null
+  url_featured_image?: string | null
   location?: string | null
   property_type?: string | null
   price_night?: number | string | null
@@ -131,12 +106,7 @@ const getStringField = (record: Record<string, unknown>, ...keys: string[]): str
   return null
 }
 
-const hasAvailabilityFields = (record: ZohoRecord) => {
-  return (
-    !!getStringField(record, 'startOfAvailability', 'Start_of_Availability', 'start_of_availability') &&
-    !!getStringField(record, 'endOfAvailability', 'End_of_Availability', 'end_of_availability')
-  )
-}
+
 
 const safeNumber = (value: unknown) => {
   if (value === null || value === undefined) {
@@ -163,7 +133,7 @@ const formatPricePerNight = (value: number | null) => {
 
 const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
   const title = record.Name?.trim() || 'Inmueble sin título'
-  const imageUrl = record.url_featured_image || DEFAULT_PROPERTY_VALUES.imageUrl
+  const imageUrl = (typeof record.url_featured_image === 'string' ? record.url_featured_image : null) || DEFAULT_PROPERTY_VALUES.imageUrl
   const location = record.location?.trim() || DEFAULT_PROPERTY_VALUES.location
   const propertyType = record.property_type?.trim() || DEFAULT_PROPERTY_TYPES[0]
   const rawPriceNight = safeNumber(record.price_night)
@@ -235,8 +205,7 @@ const buildCriteria = (filters?: ZohoFilters) => {
 
 export const fetchZohoProperties = async (filters?: ZohoFilters) => {
   const token = await fetchAccessToken()
-  // const criteria = buildCriteria(filters);
-  const criteria = null;
+ const criteria = buildCriteria(filters);
   const url = criteria
     ? `${PROPERTIES_ENDPOINT}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}&criteria=${encodeURIComponent(criteria)}`
     : `${PROPERTIES_ENDPOINT}?fields=${encodeURIComponent(PROPERTIES_FIELDS)}`

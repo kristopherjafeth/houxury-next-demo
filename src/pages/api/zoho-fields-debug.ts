@@ -74,8 +74,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const data = await response.json()
     
+    // Define type for Zoho field structure
+    type ZohoField = {
+      field_label?: string
+      api_name?: string
+      data_type?: string
+      custom_field?: boolean
+    }
+    
     // Extraer solo los campos relevantes para debugging
-    const fields = data.fields?.map((field: any) => ({
+    const fields: ZohoField[] = data.fields?.map((field: ZohoField) => ({
       field_label: field.field_label,
       api_name: field.api_name,
       data_type: field.data_type,
@@ -83,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })) || []
 
     // Filtrar campos que podrían contener URLs o imágenes
-    const imageRelatedFields = fields.filter((f: any) => 
+    const imageRelatedFields = fields.filter((f: ZohoField) => 
       f.api_name?.toLowerCase().includes('url') || 
       f.api_name?.toLowerCase().includes('image') ||
       f.api_name?.toLowerCase().includes('photo') ||
