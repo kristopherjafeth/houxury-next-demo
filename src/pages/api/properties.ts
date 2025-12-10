@@ -1,242 +1,182 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { DEFAULT_PROPERTY_TYPES } from '../../data/properties'
-import type { Property } from '../../data/properties'
-import type { Reservation } from '../../data/reservations'
-import { fetchZohoProperties, fetchZohoReservations } from '../../lib/zoho'
+import type { NextApiRequest, NextApiResponse } from "next";
+import { DEFAULT_PROPERTY_TYPES } from "../../data/properties";
+import type { Reservation } from "../../data/reservations";
+import { fetchZohoProperties } from "../../lib/zoho";
 
 const handler = async (request: NextApiRequest, response: NextApiResponse) => {
-  if (request.method !== 'GET') {
-    response.setHeader('Allow', 'GET')
-    return response.status(405).json({ message: 'Method Not Allowed' })
+  if (request.method !== "GET") {
+    response.setHeader("Allow", "GET");
+    return response.status(405).json({ message: "Method Not Allowed" });
   }
 
   try {
-  const { propertyType, checkIn, checkOut, location } = request.query
-  const checkInString = Array.isArray(checkIn) ? checkIn[0] : checkIn
-  const checkOutString = Array.isArray(checkOut) ? checkOut[0] : checkOut
-  const locationString = Array.isArray(location) ? location[0] : location
+    const { propertyType, checkIn, checkOut, location } = request.query;
+    const checkInString = Array.isArray(checkIn) ? checkIn[0] : checkIn;
+    const checkOutString = Array.isArray(checkOut) ? checkOut[0] : checkOut;
+    const locationString = Array.isArray(location) ? location[0] : location;
 
-    const parseDate = (value?: string | null) => {
-      if (!value) return null
-      const parsed = new Date(value)
-      return Number.isNaN(parsed.getTime()) ? null : parsed
-    }
-
-    const parseDateStrict = (value?: string | null) => {
-      if (!value) return null
-
-      const asIso = /^\d{4}-\d{2}-\d{2}$/.test(value)
-      if (asIso) {
-        const parts = value.split('-').map((p) => Number(p))
-        const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]))
-        return Number.isNaN(d.getTime()) ? null : d
-      }
-
-      const parsed = new Date(value)
-      if (Number.isNaN(parsed.getTime())) return null
-      // normalize to UTC midnight
-      return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()))
-    }
-
-    const checkInDate = parseDate(checkInString)
-    const checkOutDate = parseDate(checkOutString)
-
-    if (checkInDate && checkOutDate && checkOutDate <= checkInDate) {
+    // Basic date validation
+    if (checkInString && checkOutString && checkOutString <= checkInString) {
       return response.status(400).json({
-        message: 'La fecha de salida debe ser posterior a la fecha de entrada.',
-      })
+        message: "La fecha de salida debe ser posterior a la fecha de entrada.",
+      });
     }
 
+    // 1. Fetch properties (Zoho API handles seasonal availability if dates are passed)
     const properties = await fetchZohoProperties({
-      propertyType: Array.isArray(propertyType) ? propertyType[0] : (propertyType as string | undefined),
+      propertyType: Array.isArray(propertyType)
+        ? propertyType[0]
+        : (propertyType as string | undefined),
       checkIn: checkInString || null,
       checkOut: checkOutString || null,
       location: locationString || null,
-    })
+    });
 
-    const shouldCheckReservations = Boolean(checkInDate && checkOutDate)
+    let availableProperties = properties;
 
-    let reservations: Reservation[] = []
-    if (shouldCheckReservations) {
+    // 2. If dates are provided, filter out booked properties using COQL
+    if (checkInString && checkOutString) {
       try {
-        reservations = await fetchZohoReservations({
-          checkIn: checkInString || null,
-          checkOut: checkOutString || null,
-        })
-      } catch (reservationError) {
-        console.error('[api/properties] fetchZohoReservations', reservationError)
-      }
-    }
+        // Find reservations that overlap with the requested range
+        // Logic: (Check_in < RequestEnd) AND (Check_out > RequestStart)
+        // AND Status is not Cancelled
 
-    const reservationsByProperty = new Map<string, Reservation[]>()
-    if (shouldCheckReservations && reservations.length > 0) {
-      reservations.forEach((reservation) => {
-        if (!reservation.propertyId) return
-        if (!reservationsByProperty.has(reservation.propertyId)) {
-          reservationsByProperty.set(reservation.propertyId, [])
-        }
-        reservationsByProperty.get(reservation.propertyId)?.push(reservation)
-      })
-    }
+        const { searchZohoReservationsByCoql } = await import(
+          "../../lib/zoho/reservations"
+        );
+        const { getRoomsPropertyIds } = await import("../../lib/zoho/rooms");
 
-    const addUtcDays = (date: Date, amount: number) => {
-      const next = new Date(date.getTime())
-      next.setUTCDate(next.getUTCDate() + amount)
-      return next
-    }
+        const whereClause = `((Check_in <= '${checkOutString}') and (Check_out >= '${checkInString}')) and (status != 'Cancelada')`;
 
-    const toIsoDate = (date: Date) => {
-      return date.toISOString().slice(0, 10)
-    }
+        // Get reservations that conflict with the dates
+        // Pagination Strategy: Fetch in chunks of 200 until no more records are found
+        // This ensures we don't miss any conflicts even with thousands of reservations
+        const allConflictingReservations: Reservation[] = [];
+        let offset = 0;
+        const limit = 200;
+        let hasMore = true;
 
-    const enumerateDateRange = (start: Date, end: Date) => {
-      const result: string[] = []
-      for (let cursor = new Date(start.getTime()); cursor < end; cursor = addUtcDays(cursor, 1)) {
-        result.push(toIsoDate(cursor))
-      }
-      return result
-    }
+        while (hasMore) {
+          const batch = await searchZohoReservationsByCoql(
+            whereClause,
+            limit,
+            offset
+          );
 
-    const availabilityMetadata = new Map<
-      string,
-      {
-        availableDates: string[]
-        unavailableDates: string[]
-        availableNights: number
-        isFullyAvailable: boolean
-      }
-    >()
-
-    const computeReservationMetadata = (property: Property) => {
-      if (!shouldCheckReservations || !checkInDate || !checkOutDate) {
-        return {
-          availableDates: [],
-          unavailableDates: [],
-          availableNights: 0,
-          isFullyAvailable: true,
-        }
-      }
-
-      const rangeStart = checkInDate
-      const rangeEnd = checkOutDate
-
-      const cached = availabilityMetadata.get(property.id)
-      if (cached) {
-        return cached
-      }
-
-      const propertyReservations = reservationsByProperty.get(property.id) ?? []
-      if (propertyReservations.length === 0) {
-        const fullRange = enumerateDateRange(rangeStart, rangeEnd)
-        const metadata = {
-          availableDates: fullRange,
-          unavailableDates: [],
-          availableNights: fullRange.length,
-          isFullyAvailable: true,
-        }
-        availabilityMetadata.set(property.id, metadata)
-        return metadata
-      }
-
-      const reservedDates = new Set<string>()
-      propertyReservations.forEach((reservation) => {
-        const reservationStart = parseDateStrict(reservation.checkIn)
-        const reservationEnd = parseDateStrict(reservation.checkOut)
-        if (!reservationStart || !reservationEnd) return
-
-        const overlapStart = reservationStart > rangeStart ? reservationStart : rangeStart
-        const overlapEnd = reservationEnd < rangeEnd ? reservationEnd : rangeEnd
-
-        if (overlapStart >= overlapEnd) return
-
-        const overlapDates = enumerateDateRange(overlapStart, overlapEnd)
-        overlapDates.forEach((isoDate) => reservedDates.add(isoDate))
-      })
-
-      const fullRangeDates = enumerateDateRange(rangeStart, rangeEnd)
-      const unavailableDates = fullRangeDates.filter((isoDate) => reservedDates.has(isoDate))
-      const availableDates = fullRangeDates.filter((isoDate) => !reservedDates.has(isoDate))
-
-      const metadata = {
-        availableDates,
-        unavailableDates,
-        availableNights: availableDates.length,
-        isFullyAvailable: unavailableDates.length === 0,
-      }
-
-      availabilityMetadata.set(property.id, metadata)
-      return metadata
-    }
-
-    const isPropertyAvailable = (property: Property) => {
-      if (!checkInDate && !checkOutDate) return true
-
-      const start = parseDateStrict(property.startOfAvailability)
-      const end = parseDateStrict(property.endOfAvailability)
-
-      if (start && end && checkInDate && checkOutDate) {
-        if (start.getTime() > checkInDate.getTime() || end.getTime() < checkOutDate.getTime()) {
-          return false
-        }
-      } else if (start && checkInDate && start.getTime() > checkInDate.getTime()) {
-        return false
-      } else if (end && checkOutDate && end.getTime() < checkOutDate.getTime()) {
-        return false
-      }
-
-      if (!shouldCheckReservations || !checkInDate || !checkOutDate) {
-        return true
-      }
-
-      const metadata = computeReservationMetadata(property)
-      return metadata.isFullyAvailable
-    }
-
-    const dateFiltered = properties.filter(isPropertyAvailable)
-
-    const enrichedProperties =
-      shouldCheckReservations && checkInDate && checkOutDate
-        ? dateFiltered.map((property) => {
-            const metadata = computeReservationMetadata(property)
-            return {
-              ...property,
-              availableDates: metadata.availableDates,
-              unavailableDates: metadata.unavailableDates,
-              availableNights: metadata.availableNights,
-              isFullyAvailable: metadata.isFullyAvailable,
+          if (batch.length === 0) {
+            hasMore = false;
+          } else {
+            allConflictingReservations.push(...batch);
+            offset += limit;
+            // Optimization: If we got fewer records than asked, we are done
+            if (batch.length < limit) {
+              hasMore = false;
             }
-          })
-        : dateFiltered
+          }
+        }
 
-    const typeSet = new Set<string>()
-    properties.forEach((property) => {
-      if (property.type) {
-        typeSet.add(property.type)
+        // Extract Room IDs from the conflicting reservations
+        const reservedRoomIds = new Set<string>();
+        allConflictingReservations.forEach((res) => {
+          if (res.propertyId) reservedRoomIds.add(res.propertyId);
+        });
+
+        const fullyBookedPropertyIds = new Set<string>();
+
+        if (reservedRoomIds.size > 0) {
+          // Efficiently find which Property each Room belongs to
+          // This avoids fetching all rooms
+          const roomPropertyMap = await getRoomsPropertyIds(
+            Array.from(reservedRoomIds)
+          );
+
+          // Count occupied rooms per property
+          const occupiedRoomsCountByProperty = new Map<string, number>();
+
+          reservedRoomIds.forEach((roomId) => {
+            const propertyId = roomPropertyMap.get(roomId);
+            if (propertyId) {
+              const currentOccupied =
+                occupiedRoomsCountByProperty.get(propertyId) || 0;
+              occupiedRoomsCountByProperty.set(propertyId, currentOccupied + 1);
+            }
+          });
+
+          // Determine which properties are FULLY booked
+          // Rule: Hide only if Occupied Rooms >= Total Rooms (defined in Property record)
+          properties.forEach((property) => {
+            // property.rooms comes from 'number_of_rooms' in Zoho
+            const total = property.rooms ?? 0;
+            const occupied = occupiedRoomsCountByProperty.get(property.id) || 0;
+
+            if (total > 0 && occupied >= total) {
+              fullyBookedPropertyIds.add(property.id);
+            }
+          });
+        }
+
+        availableProperties = properties.filter(
+          (p) => !fullyBookedPropertyIds.has(p.id)
+        );
+      } catch (reservationError) {
+        console.error(
+          "[api/properties] Error checking reservations:",
+          reservationError
+        );
+        // Optionally fail or return all properties (risk of double booking)
+        // For now, let's log and proceed, but ideally we should alert.
       }
-    })
-
-    const availableTypes = typeSet.size ? Array.from(typeSet).sort() : [...DEFAULT_PROPERTY_TYPES]
-
-    let filtered = enrichedProperties;
-    if (propertyType && typeof propertyType === 'string' && propertyType.length > 0) {
-      filtered = filtered.filter((property) => property.type.trim().toLowerCase() === propertyType.trim().toLowerCase());
     }
-    if (locationString && typeof locationString === 'string' && locationString.length > 0) {
-      filtered = filtered.filter((property) => (property.location || '').trim().toLowerCase() === locationString.trim().toLowerCase());
+
+    // 3. Apply memory filters for static fields if needed (though fetchZohoProperties handles most)
+    // fetchZohoProperties maps the response, but client-side filtering below ensures case-insensitivity consistency
+
+    let filtered = availableProperties;
+    if (
+      propertyType &&
+      typeof propertyType === "string" &&
+      propertyType.length > 0
+    ) {
+      filtered = filtered.filter(
+        (property) =>
+          property.type.trim().toLowerCase() ===
+          propertyType.trim().toLowerCase()
+      );
     }
+    if (
+      locationString &&
+      typeof locationString === "string" &&
+      locationString.length > 0
+    ) {
+      filtered = filtered.filter(
+        (property) =>
+          (property.location || "").trim().toLowerCase() ===
+          locationString.trim().toLowerCase()
+      );
+    }
+
+    // Extract available types from the resulting properties (or original set if preferred)
+    const typeSet = new Set<string>();
+    properties.forEach((property) => {
+      // Use 'properties' (all) or 'filtered'? Typical to show types from valid results.
+      if (property.type) typeSet.add(property.type);
+    });
+    const availableTypes = typeSet.size
+      ? Array.from(typeSet).sort()
+      : [...DEFAULT_PROPERTY_TYPES];
 
     return response.status(200).json({
       properties: filtered,
       availableTypes,
-    })
+    });
   } catch (error) {
-    console.error('[api/properties]', error)
+    console.error("[api/properties]", error);
     const message =
       error instanceof Error
         ? error.message
-        : 'No se pudieron obtener las propiedades de Zoho.'
-    return response.status(500).json({ message })
+        : "No se pudieron obtener las propiedades de Zoho.";
+    return response.status(500).json({ message });
   }
-}
+};
 
-export default handler
+export default handler;

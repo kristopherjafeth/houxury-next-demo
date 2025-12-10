@@ -1,0 +1,46 @@
+export type ZohoRecord = {
+  id: string;
+  Name?: string | null;
+  Record_Image?: string | null;
+  Url_Workdrive?: string | null;
+  url_featured_image?: string | null;
+  location?: string | null;
+  property_type?: string | null;
+  price_night?: number | string | null;
+  bathroom_quantity?: number | string | null;
+  number_of_rooms?: number | string | null;
+  square_meters?: number | string | null;
+  startOfAvailability?: string | null;
+  endOfAvailability?: string | null;
+  Start_of_Availability?: string | null;
+  End_of_Availability?: string | null;
+  start_of_availability?: string | null;
+  end_of_availability?: string | null;
+  slugwordpress?: string | null;
+  features?: unknown;
+  description?: string | null;
+  [key: string]: unknown;
+};
+
+export type ZohoReservationRecord = {
+  id: string;
+  Name?: string | null;
+  room_reserved?: unknown;
+  Connected_To__s?: unknown;
+  client_name?: string | null;
+  Check_in?: string | null;
+  Check_out?: string | null;
+  status?: string | null;
+  reservation_duration?: number | string | null;
+  reservation_date?: string | null;
+  Email?: string | null;
+  Secondary_Email?: string | null;
+  phone?: string | null;
+  Tag?: unknown;
+  Record_Image?: unknown;
+  Created_By?: unknown;
+  Modified_By?: unknown;
+  Email_Opt_Out?: boolean | null;
+  Owner?: unknown;
+  [key: string]: unknown;
+};

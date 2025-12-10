@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import FilterBar, { FilterState } from "../components/FilterBar";
 import PropertyGrid, { Property } from "../components/PropertyGrid";
-import { fetchReservations, ReservationFilters } from '../lib/api/reservationsClient';
-import { Reservation } from "@/data/reservations";
 
 type ApiResponse = {
   properties: Property[];
@@ -21,14 +19,15 @@ const INITIAL_FILTERS: FilterState = {
 };
 
 const IndexPage: React.FC = () => {
-  const [filters, setFilters] = useState<FilterState>(() => ({ ...INITIAL_FILTERS }));
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    ...INITIAL_FILTERS,
+  }));
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const listingRef = useRef<HTMLDivElement>(null);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -79,7 +78,9 @@ const IndexPage: React.FC = () => {
       const data: ApiResponse & { message?: string } = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message ?? "No se pudieron cargar las propiedades");
+        throw new Error(
+          data.message ?? "No se pudieron cargar las propiedades"
+        );
       }
 
       setProperties(data.properties);
@@ -88,7 +89,7 @@ const IndexPage: React.FC = () => {
         setFilters((prev) =>
           prev.propertyType && !data.availableTypes?.includes(prev.propertyType)
             ? { ...prev, propertyType: "" }
-            : prev,
+            : prev
         );
       }
 
@@ -117,42 +118,9 @@ const IndexPage: React.FC = () => {
     setHasSearched(false);
   };
 
-
-
-const fetchReservationsWithState = async (currentFilters: ReservationFilters) => {
-  try {
-    setLoading(true);
-    setError(null);
-
-    const { reservations } = await fetchReservations(currentFilters);
-    setReservations(reservations);
-  } catch (fetchError) {
-    const message =
-      fetchError instanceof Error
-        ? fetchError.message
-        : 'No se pudieron cargar las reservaciones. Inténtalo más tarde.';
-    setError(message);
-    setReservations([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
-useEffect(() => {
-  fetchReservationsWithState({});
-}, []);
-
-useEffect(() => {
-}, [reservations]);
-
-
-console.log("properties", properties);
-
   return (
     <main className="min-h-screen bg-neutral-100">
-      <section
-        className="relative flex lg:h-[600px] lg:max-h-[600px] items-center justify-center overflow-hidden"
-      >
+      <section className="relative flex lg:h-[600px] lg:max-h-[600px] items-center justify-center overflow-hidden">
         <video
           autoPlay
           loop
@@ -164,9 +132,7 @@ console.log("properties", properties);
         </video>
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 flex w-full max-w-5xl flex-col items-center gap-10 px-4 text-center text-white">
-          <div className="h-64">
-          
-          </div>
+          <div className="h-64"></div>
           <FilterBar
             filters={filters}
             propertyTypes={propertyTypes}
@@ -174,7 +140,10 @@ console.log("properties", properties);
             onChange={(field, value) =>
               setFilters((prev) => {
                 if (field === "checkIn") {
-                  const nextCheckOut = prev.checkOut && value && prev.checkOut <= value ? "" : prev.checkOut;
+                  const nextCheckOut =
+                    prev.checkOut && value && prev.checkOut <= value
+                      ? ""
+                      : prev.checkOut;
                   return { ...prev, checkIn: value, checkOut: nextCheckOut };
                 }
 
@@ -213,7 +182,6 @@ console.log("properties", properties);
               </>
             )}
           </div>
-      
         </header>
         {error && (
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -240,8 +208,7 @@ console.log("properties", properties);
             </p>
           )
         ) : (
-       <>
-       </>
+          <></>
         )}
       </div>
     </main>
