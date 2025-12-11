@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import FilterBar, { FilterState } from "../components/FilterBar";
 import PropertyGrid, { Property } from "../components/PropertyGrid";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 type ApiResponse = {
   properties: Property[];
@@ -18,6 +19,8 @@ const INITIAL_FILTERS: FilterState = {
   location: "",
 };
 
+const ITEMS_PER_PAGE = 6;
+
 const IndexPage: React.FC = () => {
   const [filters, setFilters] = useState<FilterState>(() => ({
     ...INITIAL_FILTERS,
@@ -27,38 +30,16 @@ const IndexPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const listingRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchPropertyTypes = async () => {
-      try {
-        const response = await fetch("/api/property-types");
-        if (!response.ok) {
-          throw new Error("No se pudieron obtener los tipos de propiedad");
-        }
-        const data: PropertyTypesResponse = await response.json();
-        if (isMounted) {
-          setPropertyTypes(data.propertyTypes);
-        }
-      } catch {
-        if (isMounted) {
-          setPropertyTypes([]);
-        }
-      }
-    };
-
-    fetchPropertyTypes();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const fetchProperties = async (currentFilters: FilterState) => {
+  const fetchProperties = async (
+    currentFilters: FilterState,
+    isInitial = false
+  ) => {
     try {
       setLoading(true);
       setError(null);
-      setHasSearched(true);
 
       const query = new URLSearchParams();
 
@@ -84,6 +65,9 @@ const IndexPage: React.FC = () => {
       }
 
       setProperties(data.properties);
+      setHasSearched(true);
+      setCurrentPage(1);
+
       if (data.availableTypes?.length) {
         setPropertyTypes(data.availableTypes);
         setFilters((prev) =>
@@ -93,7 +77,7 @@ const IndexPage: React.FC = () => {
         );
       }
 
-      if (listingRef.current) {
+      if (!isInitial && listingRef.current) {
         listingRef.current.scrollIntoView({
           behavior: "smooth",
           block: "start",
@@ -111,12 +95,61 @@ const IndexPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPropertyTypes = async () => {
+      try {
+        const response = await fetch("/api/property-types");
+        if (!response.ok) {
+          throw new Error("No se pudieron obtener los tipos de propiedad");
+        }
+        const data: PropertyTypesResponse = await response.json();
+        if (isMounted) {
+          setPropertyTypes(data.propertyTypes);
+        }
+      } catch {
+        if (isMounted) {
+          setPropertyTypes([]);
+        }
+      }
+    };
+
+    fetchPropertyTypes();
+    fetchProperties(INITIAL_FILTERS, true);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleResetFilters = () => {
     setFilters({ ...INITIAL_FILTERS });
-    setProperties([]);
-    setError(null);
-    setHasSearched(false);
+    // Fetch initial properties again instead of clearing
+    fetchProperties(INITIAL_FILTERS);
   };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    if (listingRef.current) {
+      listingRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  };
+
+  // Pagination Logic
+  const totalPages = Math.ceil(properties.length / ITEMS_PER_PAGE);
+  const visibleProperties = properties.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const isDefaultFilters =
+    !filters.checkIn &&
+    !filters.checkOut &&
+    !filters.propertyType &&
+    !filters.location;
 
   return (
     <main className="min-h-screen bg-neutral-100">
@@ -171,13 +204,15 @@ const IndexPage: React.FC = () => {
             {hasSearched && (
               <>
                 <h2 className="text-3xl font-semibold text-neutral-900">
-                  Resultados de búsqueda
+                  {isDefaultFilters
+                    ? "Propiedades Destacadas"
+                    : "Resultados de búsqueda"}
                 </h2>
 
                 <p className="text-sm text-neutral-500">
                   {loading
                     ? "Buscando propiedades…"
-                    : `Encontramos ${properties.length} propiedades disponibles`}
+                    : `Mostrando ${visibleProperties.length} de ${properties.length} propiedades disponibles`}
                 </p>
               </>
             )}
@@ -200,7 +235,45 @@ const IndexPage: React.FC = () => {
               />
             </div>
           ) : properties.length ? (
-            <PropertyGrid properties={properties} />
+            <>
+              <PropertyGrid properties={visibleProperties} />
+
+              {totalPages > 1 && (
+                <div className="mt-8 flex justify-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-neutral-600 shadow-sm transition hover:bg-neutral-50 disabled:opacity-50 disabled:hover:bg-white"
+                  >
+                    <FiChevronLeft className="h-5 w-5" />
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`h-10 w-10 rounded-full text-sm font-medium transition ${
+                          currentPage === page
+                            ? "bg-[#b49a66] text-white shadow-md"
+                            : "bg-white text-neutral-600 shadow-sm hover:bg-neutral-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-neutral-600 shadow-sm transition hover:bg-neutral-50 disabled:opacity-50 disabled:hover:bg-white"
+                  >
+                    <FiChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              )}
+            </>
           ) : error ? null : (
             <p className="mx-auto max-w-6xl px-4 text-center text-sm text-neutral-500">
               No encontramos propiedades que coincidan con tu búsqueda. Ajusta
