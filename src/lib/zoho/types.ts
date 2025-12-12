@@ -4,12 +4,14 @@ export type ZohoRecord = {
   Record_Image?: string | null;
   Url_Workdrive?: string | null;
   url_featured_image?: string | null;
-  location?: string | null;
+  city?: string | null;
   property_type?: string | null;
+  Property_Type?: string | null;
   price_night?: number | string | null;
   bathroom_quantity?: number | string | null;
   number_of_rooms?: number | string | null;
   square_meters?: number | string | null;
+  Size_sqm?: number | string | null;
   startOfAvailability?: string | null;
   endOfAvailability?: string | null;
   Start_of_Availability?: string | null;

@@ -9,7 +9,7 @@ import type { ZohoRecord } from "./types";
 import { formatPricePerNight, getStringField, safeNumber } from "./utils";
 
 export type ZohoFilters = {
-  propertyType?: string | null;
+  propertyType?: string | string[] | null;
   checkIn?: string | null;
   checkOut?: string | null;
   location?: string | null;
@@ -21,13 +21,23 @@ const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
     (typeof record.url_featured_image === "string"
       ? record.url_featured_image
       : null) || DEFAULT_PROPERTY_VALUES.imageUrl;
-  const location = record.location?.trim() || DEFAULT_PROPERTY_VALUES.location;
+  const city = record.city || DEFAULT_PROPERTY_VALUES.city;
   const propertyType =
-    record.property_type?.trim() || DEFAULT_PROPERTY_TYPES[0];
+    record.property_type?.trim() ||
+    record.Property_Type?.trim() ||
+    DEFAULT_PROPERTY_TYPES[0];
+
+  if (!record.property_type && !record.Property_Type) {
+    console.warn(
+      `[mapRecordToProperty] Warning: Property type missing for record ${record.id} (${record.Name}). Defaulting to ${propertyType}. Record keys:`,
+      Object.keys(record)
+    );
+  }
+
   const rawPriceNight = safeNumber(record.price_night);
   const bathrooms = safeNumber(record.bathroom_quantity);
   const rooms = safeNumber(record.number_of_rooms);
-  const squareMeters = safeNumber(record.square_meters);
+  const squareMeters = safeNumber(record.Size_sqm || record.square_meters);
 
   const pricePerNight = formatPricePerNight(rawPriceNight);
 
@@ -43,7 +53,7 @@ const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
   return {
     id: record.id,
     title,
-    location,
+    city,
     pricePerNight,
     type: propertyType,
     imageUrl,
@@ -74,11 +84,18 @@ const buildCriteria = (filters?: ZohoFilters) => {
   const parts: string[] = [];
 
   if (filters.propertyType) {
-    parts.push(`(property_type:equals:${filters.propertyType})`);
+    if (Array.isArray(filters.propertyType)) {
+      const typeConditions = filters.propertyType
+        .map((t) => `(property_type:equals:${t})`)
+        .join(" or ");
+      parts.push(`(${typeConditions})`);
+    } else {
+      parts.push(`(property_type:equals:${filters.propertyType})`);
+    }
   }
 
   if (filters.location) {
-    parts.push(`(location:equals:${filters.location})`);
+    parts.push(`(city:equals:${filters.location})`);
   }
 
   if (filters.checkIn) {
@@ -130,7 +147,7 @@ export const fetchZohoProperties = async (filters?: ZohoFilters) => {
 export const fetchZohoPropertyTypes = async () => {
   const token = await fetchAccessToken();
   const response = await fetch(
-    `${ZOHO_CONFIG.PROPERTIES_ENDPOINT}?fields=property_type`,
+    `${ZOHO_CONFIG.PROPERTIES_ENDPOINT}?fields=property_type,Property_Type`,
     {
       headers: {
         Authorization: `Zoho-oauthtoken ${token}`,
@@ -145,18 +162,26 @@ export const fetchZohoPropertyTypes = async () => {
     );
   }
 
-  const payload: { data?: Array<{ property_type?: string | null }> } =
-    await response.json();
+  const payload: {
+    data?: Array<{
+      property_type?: string | null;
+      Property_Type?: string | null;
+    }>;
+  } = await response.json();
+  console.log("payload", payload);
 
   const uniqueTypes = new Set<string>();
   payload.data?.forEach((record) => {
-    const type = record.property_type?.trim();
+    const type = (record.property_type || record.Property_Type)?.trim();
     if (type) {
       uniqueTypes.add(type);
     }
   });
 
-  return uniqueTypes.size
-    ? Array.from(uniqueTypes).sort()
-    : DEFAULT_PROPERTY_TYPES;
+  const combinedTypes = new Set([
+    ...Array.from(uniqueTypes),
+    ...DEFAULT_PROPERTY_TYPES,
+  ]);
+
+  return Array.from(combinedTypes).sort();
 };

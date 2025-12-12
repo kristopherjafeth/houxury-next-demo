@@ -25,12 +25,14 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     // 1. Fetch properties (Zoho API handles seasonal availability if dates are passed)
     const properties = await fetchZohoProperties({
       propertyType: Array.isArray(propertyType)
-        ? propertyType[0]
+        ? propertyType
         : (propertyType as string | undefined),
       checkIn: checkInString || null,
       checkOut: checkOutString || null,
       location: locationString || null,
     });
+
+    console.log("properties", properties);
 
     let availableProperties = properties;
 
@@ -150,7 +152,7 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     ) {
       filtered = filtered.filter(
         (property) =>
-          (property.location || "").trim().toLowerCase() ===
+          (property.city || "").trim().toLowerCase() ===
           locationString.trim().toLowerCase()
       );
     }

@@ -19,7 +19,7 @@ const INITIAL_FILTERS: FilterState = {
   location: "",
 };
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 12;
 
 const IndexPage: React.FC = () => {
   const [filters, setFilters] = useState<FilterState>(() => ({
@@ -67,15 +67,6 @@ const IndexPage: React.FC = () => {
       setProperties(data.properties);
       setHasSearched(true);
       setCurrentPage(1);
-
-      if (data.availableTypes?.length) {
-        setPropertyTypes(data.availableTypes);
-        setFilters((prev) =>
-          prev.propertyType && !data.availableTypes?.includes(prev.propertyType)
-            ? { ...prev, propertyType: "" }
-            : prev
-        );
-      }
 
       if (!isInitial && listingRef.current) {
         listingRef.current.scrollIntoView({
@@ -152,7 +143,7 @@ const IndexPage: React.FC = () => {
     !filters.location;
 
   return (
-    <main className="min-h-screen bg-neutral-100">
+    <main className="min-h-screen bg-black text-white">
       <section className="relative flex lg:h-[600px] lg:max-h-[600px] items-center justify-center overflow-hidden">
         <video
           autoPlay
@@ -197,23 +188,79 @@ const IndexPage: React.FC = () => {
 
       <section
         ref={listingRef}
-        className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-12"
+        className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-2 py-12"
       >
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             {hasSearched && (
               <>
-                <h2 className="text-3xl font-semibold text-neutral-900">
-                  {isDefaultFilters
-                    ? "Propiedades Destacadas"
-                    : "Resultados de búsqueda"}
-                </h2>
+                {filters.propertyType ? (
+                  <div className="flex flex-col gap-2">
+                    <h2 className="text-3xl font-semibold text-white">
+                      {filters.propertyType === "Corporativo"
+                        ? "Resultados de Apartamentos Corporativos"
+                        : filters.propertyType === "Coliving"
+                        ? "Resultados de Coliving"
+                        : `Resultados de ${filters.propertyType}`}
+                    </h2>
+                    {(filters.propertyType === "Corporativo" ||
+                      filters.propertyType === "Coliving") && (
+                      <p className="text-lg text-neutral-300">
+                        {filters.propertyType === "Corporativo"
+                          ? "Alquiler de Apartamentos Completos (privacidad y exclusividad)"
+                          : "Alquiler de Habitaciones Privadas con Zonas Comunes Compartidas"}
+                      </p>
+                    )}
 
-                <p className="text-sm text-neutral-500">
-                  {loading
-                    ? "Buscando propiedades…"
-                    : `Mostrando ${visibleProperties.length} de ${properties.length} propiedades disponibles`}
-                </p>
+                    {(filters.propertyType === "Corporativo" ||
+                      filters.propertyType === "Coliving") && (
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        {(filters.propertyType === "Corporativo"
+                          ? ["Nº habitaciones", "Terraza", "Lavadora"]
+                          : [
+                              "Terraza",
+                              "Baño privado",
+                              "Cocina privada",
+                              "Tipo de cama",
+                              "Vestidor",
+                              "Armario empotrado",
+                            ]
+                        ).map((filter) => (
+                          <label
+                            key={filter}
+                            className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50"
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-neutral-300 text-[#b49a66] focus:ring-[#b49a66]"
+                            />
+                            {filter}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-2 h-px w-full bg-neutral-800" />
+                    <p className="mt-2 text-sm text-neutral-400">
+                      {loading
+                        ? "Buscando propiedades…"
+                        : `Mostrando ${visibleProperties.length} de ${properties.length} propiedades disponibles`}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-3xl font-semibold text-white">
+                      {isDefaultFilters
+                        ? "Propiedades Destacadas"
+                        : "Resultados de búsqueda"}
+                    </h2>
+
+                    <p className="text-sm text-neutral-200">
+                      {loading
+                        ? "Buscando propiedades…"
+                        : `Mostrando ${visibleProperties.length} de ${properties.length} propiedades disponibles`}
+                    </p>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -225,7 +272,7 @@ const IndexPage: React.FC = () => {
         )}
       </section>
 
-      <div className="bg-neutral-100 pb-16">
+      <div className="bg-black pb-16">
         {hasSearched ? (
           loading ? (
             <div className="mx-auto flex max-w-6xl justify-center px-4">
@@ -275,7 +322,7 @@ const IndexPage: React.FC = () => {
               )}
             </>
           ) : error ? null : (
-            <p className="mx-auto max-w-6xl px-4 text-center text-sm text-neutral-500">
+            <p className="mx-auto max-w-6xl px-4 text-center text-sm text-neutral-400">
               No encontramos propiedades que coincidan con tu búsqueda. Ajusta
               los filtros e inténtalo de nuevo.
             </p>
