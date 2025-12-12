@@ -25,11 +25,16 @@ const IndexPage: React.FC = () => {
   const [filters, setFilters] = useState<FilterState>(() => ({
     ...INITIAL_FILTERS,
   }));
+  const [appliedFilters, setAppliedFilters] = useState<FilterState>(() => ({
+    ...INITIAL_FILTERS,
+  }));
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [extraFilters, setExtraFilters] = useState<string[]>([]);
+  const [selectedRooms, setSelectedRooms] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const listingRef = useRef<HTMLDivElement>(null);
 
@@ -37,6 +42,9 @@ const IndexPage: React.FC = () => {
     currentFilters: FilterState,
     isInitial = false
   ) => {
+    // Cuando buscamos, actualizamos los filtros aplicados para que la UI de resultados coincida
+    setAppliedFilters(currentFilters);
+
     try {
       setLoading(true);
       setError(null);
@@ -129,9 +137,41 @@ const IndexPage: React.FC = () => {
     }
   };
 
-  // Pagination Logic
-  const totalPages = Math.ceil(properties.length / ITEMS_PER_PAGE);
-  const visibleProperties = properties.slice(
+  !filters.propertyType && !filters.location;
+
+  const filteredProperties = properties.filter((p) => {
+    if (extraFilters.length === 0) return true;
+    return extraFilters.every((filter) => {
+      // Logic for each specific extra filter
+      if (filter === "Terraza") return p.hasTerrace === true;
+      if (filter === "Lavadora") return p.hasWasher === true;
+      if (filter === "Cantidad de Baños") return (p.bathrooms ?? 0) > 0;
+      // Default fallback
+      return true;
+    });
+  });
+
+  const finalFilteredProperties = filteredProperties.filter((p) => {
+    if (selectedRooms !== null) {
+      // Check exact match of rooms
+      return p.rooms === selectedRooms;
+    }
+    return true;
+  });
+
+  // Derived available options for "Nº habitaciones"
+  const availableRoomCounts = Array.from(
+    new Set(
+      properties
+        .map((p) => p.rooms)
+        .filter((r): r is number => r !== null && r > 0)
+    )
+  ).sort((a, b) => a - b);
+
+  // Calculate pages based on filtered list
+  const totalPages = Math.ceil(finalFilteredProperties.length / ITEMS_PER_PAGE);
+
+  const visibleProperties = finalFilteredProperties.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -141,6 +181,12 @@ const IndexPage: React.FC = () => {
     !filters.checkOut &&
     !filters.propertyType &&
     !filters.location;
+
+  const isDefaultAppliedFilters =
+    !appliedFilters.checkIn &&
+    !appliedFilters.checkOut &&
+    !appliedFilters.propertyType &&
+    !appliedFilters.location;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -194,37 +240,67 @@ const IndexPage: React.FC = () => {
           <div>
             {hasSearched && (
               <>
-                {filters.propertyType ? (
+                {appliedFilters.propertyType ? (
                   <div className="flex flex-col gap-2">
                     <h2 className="text-3xl font-semibold text-white">
-                      {filters.propertyType === "Corporativo"
+                      {appliedFilters.propertyType === "Corporativo"
                         ? "Resultados de Apartamentos Corporativos"
-                        : filters.propertyType === "Coliving"
+                        : appliedFilters.propertyType === "Coliving"
                         ? "Resultados de Coliving"
-                        : `Resultados de ${filters.propertyType}`}
+                        : `Resultados de ${appliedFilters.propertyType}`}
                     </h2>
-                    {(filters.propertyType === "Corporativo" ||
-                      filters.propertyType === "Coliving") && (
+                    {(appliedFilters.propertyType === "Corporativo" ||
+                      appliedFilters.propertyType === "Coliving") && (
                       <p className="text-lg text-neutral-300">
-                        {filters.propertyType === "Corporativo"
+                        {appliedFilters.propertyType === "Corporativo"
                           ? "Alquiler de Apartamentos Completos (privacidad y exclusividad)"
                           : "Alquiler de Habitaciones Privadas con Zonas Comunes Compartidas"}
                       </p>
                     )}
 
-                    {(filters.propertyType === "Corporativo" ||
-                      filters.propertyType === "Coliving") && (
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        {(filters.propertyType === "Corporativo"
-                          ? ["Nº habitaciones", "Terraza", "Lavadora"]
-                          : [
-                              "Terraza",
-                              "Baño privado",
-                              "Cocina privada",
-                              "Tipo de cama",
-                              "Vestidor",
-                              "Armario empotrado",
-                            ]
+                    {(appliedFilters.propertyType === "Corporativo" ||
+                      appliedFilters.propertyType === "Coliving") && (
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        {/* Select for Number of Rooms - only for Corporativo */}
+                        {appliedFilters.propertyType === "Corporativo" && (
+                          <div className="relative">
+                            <select
+                              value={selectedRooms ?? ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSelectedRooms(val ? Number(val) : null);
+                                setCurrentPage(1);
+                              }}
+                              className="appearance-none rounded-full border border-neutral-200 bg-white pl-4 pr-10 py-2 text-sm text-neutral-600 focus:border-[#b49a66] focus:outline-none focus:ring-1 focus:ring-[#b49a66]"
+                            >
+                              <option value="">Nº habitaciones</option>
+                              {availableRoomCounts.map((count) => (
+                                <option key={count} value={count}>
+                                  {count}{" "}
+                                  {count === 1 ? "habitación" : "habitaciones"}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                              <svg
+                                className="h-4 w-4 text-neutral-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                        {(appliedFilters.propertyType === "Corporativo"
+                          ? ["Terraza", "Lavadora"]
+                          : ["Terraza", "Cantidad de Baños"]
                         ).map((filter) => (
                           <label
                             key={filter}
@@ -232,6 +308,16 @@ const IndexPage: React.FC = () => {
                           >
                             <input
                               type="checkbox"
+                              checked={extraFilters.includes(filter)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setExtraFilters((prev) =>
+                                  checked
+                                    ? [...prev, filter]
+                                    : prev.filter((f) => f !== filter)
+                                );
+                                setCurrentPage(1); // Reset to first page on filter change
+                              }}
                               className="h-4 w-4 rounded border-neutral-300 text-[#b49a66] focus:ring-[#b49a66]"
                             />
                             {filter}
@@ -243,13 +329,13 @@ const IndexPage: React.FC = () => {
                     <p className="mt-2 text-sm text-neutral-400">
                       {loading
                         ? "Buscando propiedades…"
-                        : `Mostrando ${visibleProperties.length} de ${properties.length} propiedades disponibles`}
+                        : `Mostrando ${visibleProperties.length} de ${finalFilteredProperties.length} propiedades disponibles`}
                     </p>
                   </div>
                 ) : (
                   <>
                     <h2 className="text-3xl font-semibold text-white">
-                      {isDefaultFilters
+                      {isDefaultAppliedFilters
                         ? "Propiedades Destacadas"
                         : "Resultados de búsqueda"}
                     </h2>
@@ -257,7 +343,7 @@ const IndexPage: React.FC = () => {
                     <p className="text-sm text-neutral-200">
                       {loading
                         ? "Buscando propiedades…"
-                        : `Mostrando ${visibleProperties.length} de ${properties.length} propiedades disponibles`}
+                        : `Mostrando ${visibleProperties.length} de ${finalFilteredProperties.length} propiedades disponibles`}
                     </p>
                   </>
                 )}

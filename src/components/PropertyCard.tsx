@@ -67,7 +67,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   }
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-xl bg-[#1c1c1c] text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl bg-[#242424] text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
       <div className="relative h-64 w-full overflow-hidden">
         <Image
           src={info.imgSrc}

@@ -63,6 +63,8 @@ const mapRecordToProperty = async (record: ZohoRecord): Promise<Property> => {
     rooms,
     squareMeters,
     rawPricePerNight: rawPriceNight,
+    hasTerrace: record.Has_Terrace ?? null,
+    hasWasher: record.Has_Washer ?? null,
     startOfAvailability: getStringField(
       record,
       "startOfAvailability",
@@ -141,7 +143,7 @@ export const fetchZohoProperties = async (filters?: ZohoFilters) => {
     records.map((record) => mapRecordToProperty(record))
   );
 
-  return properties;
+  return properties.filter((p) => (p.rooms ?? 0) > 0);
 };
 
 export const fetchZohoPropertyTypes = async () => {

@@ -17,6 +17,8 @@ export type Property = {
   unavailableDates?: string[];
   availableNights?: number;
   isFullyAvailable?: boolean;
+  hasTerrace?: boolean | null;
+  hasWasher?: boolean | null;
   slugWordpress?: string | null;
 };
 
@@ -39,5 +41,7 @@ export const DEFAULT_PROPERTY_VALUES = {
   unavailableDates: [] as string[],
   availableNights: 0,
   isFullyAvailable: true,
+  hasTerrace: null as boolean | null,
+  hasWasher: null as boolean | null,
   slugWordpress: null,
 };

@@ -1,90 +1,113 @@
-import React from 'react'
+import React, { useCallback } from "react";
 import { IoReload } from "react-icons/io5";
+import FilterInput from "./filters/FilterInput";
+import FilterSelect from "./filters/FilterSelect";
 
 export type FilterState = {
-  checkIn: string
-  checkOut: string
-  propertyType: string
-  location: string
-}
+  checkIn: string;
+  checkOut: string;
+  propertyType: string;
+  location: string;
+};
 
 type FilterBarProps = {
-  filters: FilterState
-  propertyTypes: string[]
-  onChange: (field: keyof FilterState, value: string) => void
-  onSubmit: (filters: FilterState) => void
-  onReset: () => void
-  loading?: boolean
-}
+  filters: FilterState;
+  propertyTypes: string[];
+  onChange: (field: keyof FilterState, value: string) => void;
+  onSubmit: (filters: FilterState) => void;
+  onReset: () => void;
+  loading?: boolean;
+};
 
-const FilterBar: React.FC<FilterBarProps> = ({ filters, propertyTypes, onChange, onSubmit, onReset, loading = false }) => {
+const LOCATIONS = [
+  { value: "Barcelona", label: "Barcelona" },
+  { value: "Madrid", label: "Madrid" },
+];
+
+const FilterBar: React.FC<FilterBarProps> = ({
+  filters,
+  propertyTypes,
+  onChange,
+  onSubmit,
+  onReset,
+  loading = false,
+}) => {
+  const handleCheckInChange = useCallback(
+    (value: string) => {
+      onChange("checkIn", value);
+    },
+    [onChange]
+  );
+
+  const handleCheckOutChange = useCallback(
+    (value: string) => {
+      onChange("checkOut", value);
+    },
+    [onChange]
+  );
+
+  const handlePropertyTypeChange = useCallback(
+    (value: string) => {
+      onChange("propertyType", value);
+    },
+    [onChange]
+  );
+
+  const handleLocationChange = useCallback(
+    (value: string) => {
+      onChange("location", value);
+    },
+    [onChange]
+  );
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSubmit(filters);
+  };
+
   return (
     <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSubmit(filters)
-      }}
-      className="w-full rounded-xl bg-transparent p-4 "
+      onSubmit={handleSubmit}
+      className="w-full rounded-xl bg-transparent p-4"
     >
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(4,minmax(0,1fr))_auto_auto] md:items-end">
-        <label className="flex flex-col text-sm font-medium text-[#b49a66]">
-          Fecha de entrada
-          <input
-            type="date"
-            value={filters.checkIn}
-            
-            onChange={(event) => onChange('checkIn', event.target.value)}
-            className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-          />
-        </label>
+        <FilterInput
+          label="Fecha de entrada"
+          type="date"
+          value={filters.checkIn}
+          onChange={handleCheckInChange}
+        />
 
-        <label className="flex flex-col text-sm font-medium text-[#b49a66]">
-          Fecha de salida
-          <input
-            type="date"
-            value={filters.checkOut}
-            
-            min={filters.checkIn || undefined}
-            onChange={(event) => onChange('checkOut', event.target.value)}
-            className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-          />
-        </label>
+        <FilterInput
+          label="Fecha de salida"
+          type="date"
+          value={filters.checkOut}
+          min={filters.checkIn || undefined}
+          onChange={handleCheckOutChange}
+        />
 
-        <label className="flex flex-col text-sm font-medium text-[#b49a66]">
-          Tipo de inmueble
-          <select
-            value={filters.propertyType}
-            onChange={(event) => onChange('propertyType', event.target.value)}
-            className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-          >
-            <option value="">Todos</option>
-            {propertyTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FilterSelect
+          label="Tipo de inmueble"
+          value={filters.propertyType}
+          options={propertyTypes}
+          onChange={handlePropertyTypeChange}
+          placeholder="Todos"
+        />
 
-        <label className="flex flex-col text-sm font-medium text-[#b49a66]">
-          Ubicación
-          <select
-            value={filters.location}
-            onChange={(event) => onChange('location', event.target.value)}
-            className="mt-2 h-12 rounded-lg border border-neutral-200 bg-neutral-50 px-4 text-base text-neutral-900 outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-          >
-            <option value="">Todas</option>
-            <option value="Barcelona">Barcelona</option>
-            <option value="Madrid">Madrid</option>
-          </select>
-        </label>
+        <FilterSelect
+          label="Ubicación"
+          value={filters.location}
+          options={LOCATIONS}
+          onChange={handleLocationChange}
+          placeholder="Todas"
+        />
 
         <button
           type="submit"
           disabled={loading}
           className="h-12 rounded-lg cursor-pointer bg-[#b49a66] px-6 text-base font-semibold text-white transition hover:bg-[#9c8452] focus:outline-none focus:ring-2 focus:ring-[#e7d6ac] disabled:cursor-not-allowed disabled:bg-[#c7b897]"
         >
-          {loading ? 'Buscando…' : 'Buscar'}
+          {loading ? "Buscando…" : "Buscar"}
         </button>
         <button
           type="button"
@@ -96,7 +119,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, propertyTypes, onChange,
         </button>
       </div>
     </form>
-  )
-}
+  );
+};
 
-export default FilterBar
+export default FilterBar;

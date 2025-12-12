@@ -12,6 +12,8 @@ export type ZohoRecord = {
   number_of_rooms?: number | string | null;
   square_meters?: number | string | null;
   Size_sqm?: number | string | null;
+  Has_Terrace?: boolean | null;
+  Has_Washer?: boolean | null;
   startOfAvailability?: string | null;
   endOfAvailability?: string | null;
   Start_of_Availability?: string | null;
