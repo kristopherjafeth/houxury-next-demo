@@ -71,12 +71,12 @@ export default function WidgetPage() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent p-4 sm:p-8">
+    <div className="min-h-screen bg-transparent mx-0 px-0">
       <Head>
         <title>Habitaciones Disponibles</title>
       </Head>
 
-      <main className="mx-auto max-w-7xl relative">
+      <main className="relative w-full mx-0 px-0">
         {loading ? (
           <div className="flex h-64 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-neutral-800"></div>
