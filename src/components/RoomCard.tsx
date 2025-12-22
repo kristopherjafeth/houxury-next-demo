@@ -1,103 +1,106 @@
-import React from 'react'
-import Image from 'next/image'
-import type { ZohoRoom } from '../lib/zoho'
+import React, { useState } from "react";
+import Image from "next/image";
+import type { ZohoRoom } from "../lib/zoho";
+import { DEFAULT_PROPERTY_VALUES } from "../data/properties";
 
 type RoomCardProps = {
-  room: ZohoRoom
-}
+  room: ZohoRoom;
+};
 
 const RoomCard: React.FC<RoomCardProps> = ({ room }) => {
+  const [imgSrc, setImgSrc] = useState(room.imageUrl);
+  const [errored, setErrored] = useState(false);
+
+  const handleImageError = () => {
+    if (!errored) {
+      setImgSrc(DEFAULT_PROPERTY_VALUES.imageUrl);
+      setErrored(true);
+    }
+  };
+
   const stats: Array<{ label: string; value: string | null }> = [
-    { label: 'Baños', value: room.bathrooms !== null ? `${room.bathrooms}` : null },
     {
-      label: 'Superficie',
+      label: "Baños",
+      value: room.bathrooms !== null ? `${room.bathrooms}` : null,
+    },
+    {
+      label: "Superficie",
       value: room.squareMeters !== null ? `${room.squareMeters} m²` : null,
     },
-  ]
-  const hasStats = stats.some((stat) => stat.value)
-  const hasFeatures = room.features.length > 0
+  ];
+  const hasStats = stats.some((stat) => stat.value);
 
   const handleReserve = () => {
     // Aquí puedes agregar la lógica de reserva
-    console.log('Reservar habitación:', room.id)
+    console.log("Reservar habitación:", room.id);
     // Por ejemplo, redirigir a una página de reserva o abrir un modal
-  }
+    // window.open(reservationUrl, '_blank')
+  };
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
-      <div className="relative h-48 w-full overflow-hidden">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl bg-[#242424] text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
+      <div className="relative h-64 w-full overflow-hidden">
         <Image
-          src={room.imageUrl}
+          src={imgSrc}
           alt={room.name}
           className="h-full w-full object-cover"
-          width={400}
-          height={300}
+          width={600}
+          height={400}
+          onError={handleImageError}
         />
-        <div className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-sm font-medium text-white">
-          {room.pricePerNight}
-        </div>
       </div>
-      <div className="flex flex-1 flex-col gap-3 p-6">
-        <header>
-          <h3 className="text-xl font-semibold text-neutral-900">{room.name}</h3>
-          {room.propertyName && (
-            <div className="mt-1 text-sm text-neutral-500">
-              en <span className="font-medium text-neutral-700">{room.propertyName}</span>
-            </div>
-          )}
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <header className="flex flex-col gap-2">
+          <h3 className="text-lg font-bold leading-tight">{room.name}</h3>
+          <div className="flex items-center gap-3">
+            <span className="rounded-sm bg-[#d9d9d9] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
+              HABITACIÓN
+            </span>
+            {room.propertyName && (
+              <span className="text-sm font-bold text-white">
+                {room.propertyName}
+              </span>
+            )}
+          </div>
         </header>
 
         {room.description && (
-          <p className="line-clamp-3 text-sm text-neutral-600">{room.description}</p>
+          <p className="text-xs text-neutral-300 line-clamp-2">
+            {room.description}
+          </p>
         )}
 
         {hasStats && (
-          <div className="grid grid-cols-2 gap-3 text-sm text-neutral-700">
+          <div className="mt-2 grid grid-cols-3 gap-2 border-t border-neutral-700 pt-4">
             {stats.map((stat) =>
               stat.value ? (
                 <div
                   key={stat.label}
-                  className="rounded-lg bg-neutral-50 px-3 py-2 text-center"
+                  className="flex flex-col items-center text-center"
                 >
-                  <p className="text-xs uppercase tracking-wide text-neutral-400">
+                  <span className="text-[12px] font-medium text-white">
                     {stat.label}
-                  </p>
-                  <p className="font-semibold text-neutral-900">{stat.value}</p>
+                  </span>
+                  <span className="text-[12px] font-bold text-white">
+                    {stat.value.replace(" m²", "m2")}
+                  </span>
                 </div>
               ) : null
             )}
           </div>
         )}
 
-        {hasFeatures && (
-          <ul className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-neutral-700">
-            {room.features.slice(0, 4).map((feature) => (
-              <li
-                key={feature}
-                className="rounded-full bg-neutral-100 px-3 py-1"
-              >
-                {feature}
-              </li>
-            ))}
-            {room.features.length > 4 && (
-              <li className="rounded-full bg-neutral-100 px-3 py-1 text-neutral-500">
-                +{room.features.length - 4} más
-              </li>
-            )}
-          </ul>
-        )}
-
-        <div className="mt-auto">
+        <div className="mt-auto pt-2">
           <button
             onClick={handleReserve}
-            className="inline-flex cursor-pointer w-full items-center justify-center rounded-lg bg-[#b49a66] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9c8452] focus:outline-none"
+            className="inline-flex w-full cursor-pointer items-center justify-center rounded bg-[#c5b38b] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#b09e78] focus:outline-none focus:ring-2 focus:ring-[#e7d6ac]"
           >
             Reservar habitación
           </button>
         </div>
       </div>
     </article>
-  )
-}
+  );
+};
 
-export default RoomCard
+export default RoomCard;
