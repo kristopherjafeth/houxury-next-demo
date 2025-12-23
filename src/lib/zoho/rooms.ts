@@ -23,6 +23,49 @@ export type ZohoRoom = {
   description: string;
   hasTerrace: boolean | null;
   hasWasher: boolean | null;
+  detailedAmenities: Record<string, string>;
+};
+
+const DETAIL_FIELDS_MAPPING: Record<string, string> = {
+  "Tamaño de la Habitación (m²)": "square_meters",
+  "Tipo de Habitación": "Tipo_de_Habitaci_n",
+  "Tipo de Cama": "Tipo_de_Cama",
+  Orientación: "Orientaci_n",
+  "Ventana a la Calle": "Ventana_a_la_Calle",
+  "Aire acondicionado": "A_C_Aire_Acondicionado",
+  "Habitación Amueblada": "Habitaci_n_Amueblada",
+  "Armario Empotrado": "Armario_Empotrado",
+  Escritorio: "Escritorio",
+  "Baño Privado": "Ba_o_Privado",
+  Vestidor: "Vestidor",
+  "Canapé con almacenamiento": "Canap_con_almacenamiento",
+  Mesillas: "Mesillas",
+  "Lámpara interior": "L_mpara_interior",
+  "Espejo de cuerpo entero": "Espejo_de_cuerpo_entero",
+  Armario: "Armario",
+  "TV en habitación": "TV_en_habitaci_n",
+  "WiFi alta velocidad": "WiFi_alta_velocidad",
+  "Cerradura digital Akiles": "Cerradura_digital_Akiles",
+  Calefacción: "Calefacci_n",
+  "Buena ventilación natural": "Buena_ventilaci_n_natural",
+  "Cocina privada": "Cocina_privada",
+  Extractor: "Extractor",
+  Lavadora: "Lavadora",
+  Balcón: "Balc_n",
+  Terraza: "Has_Terrace",
+  Patio: "Patio",
+  "Vistas al mar": "Vistas_al_mar",
+  "Vistas espectaculares del centro": "Vistas_espectaculares_del_centro",
+  "Vistas al campo": "Vistas_al_campo",
+  "Cama doble": "Cama_doble",
+  "Cortinas opacas": "Cortinas_opacas",
+  "Ventanas insonorizadas": "Ventanas_insonorizadas",
+  "Silla ergonómica": "Silla_ergon_mica",
+  "Lámpara de escritorio": "L_mpara_de_escritorio",
+  "Enchufes múltiples / USB": "Enchufes_m_ltiples_USB",
+  "Área descanso": "rea_descanso",
+  Comedor: "Comedor",
+  Secadora: "Secadora",
 };
 
 const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
@@ -57,6 +100,56 @@ const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
   const hasWasher =
     typeof record.Has_Washer === "boolean" ? record.Has_Washer : null;
 
+  // New specific fields based on API names
+  const amenityFields: Record<string, string> = {
+    A_C_Aire_Acondicionado: "Aire acondicionado",
+    rea_descanso: "Área descanso",
+    Armario: "Armario",
+    Armario_Empotrado: "Armario Empotrado",
+    Balc_n: "Balcón",
+    Ba_o_Privado: "Baño Privado",
+    Buena_ventilaci_n_natural: "Buena ventilación natural",
+    Calefacci_n: "Calefacción",
+    Cama_doble: "Cama doble",
+    Canap_con_almacenamiento: "Canapé con almacenamiento",
+    Cerradura_digital_Akiles: "Cerradura digital Akiles",
+    Cocina_privada: "Cocina privada",
+    Comedor: "Comedor",
+    Cortinas_opacas: "Cortinas opacas",
+    Enchufes_m_ltiples_USB: "Enchufes múltiples / USB",
+    Escritorio: "Escritorio",
+    Espejo_de_cuerpo_entero: "Espejo de cuerpo entero",
+    Extractor: "Extractor",
+    Extractor_de_humo: "Extractor de humo",
+    Habitaci_n_Amueblada: "Habitación Amueblada",
+    L_mpara_de_escritorio: "Lámpara de escritorio",
+    L_mpara_interior: "Lámpara interior",
+    Lavadora: "Lavadora",
+    Maleteros: "Maleteros",
+  };
+
+  const dynamicFeatures: string[] = [];
+  Object.entries(amenityFields).forEach(([key, label]) => {
+    if (record[key] === true) {
+      dynamicFeatures.push(label);
+    }
+  });
+
+  const allFeatures = Array.from(new Set([...featureList, ...dynamicFeatures]));
+
+  // Build detailed amenities map
+  const detailedAmenities: Record<string, string> = {};
+  Object.entries(DETAIL_FIELDS_MAPPING).forEach(([label, apiKey]) => {
+    const value = record[apiKey];
+    if (typeof value === "boolean") {
+      detailedAmenities[label] = value ? "Sí" : "No";
+    } else if (value === null || value === undefined || value === "") {
+      detailedAmenities[label] = "-";
+    } else {
+      detailedAmenities[label] = String(value);
+    }
+  });
+
   return {
     id: record.id,
     name,
@@ -67,10 +160,11 @@ const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
     pricePerNight,
     bathrooms,
     squareMeters,
-    features: featureList,
+    features: allFeatures,
     description,
     hasTerrace,
     hasWasher,
+    detailedAmenities,
   };
 };
 
@@ -106,9 +200,7 @@ export const fetchZohoRooms = async (filters?: ZohoRoomFilters) => {
   const token = await fetchAccessToken();
 
   if (filters?.id) {
-    const url = `${ZOHO_CONFIG.ROOMS_ENDPOINT}/${
-      filters.id
-    }?fields=${encodeURIComponent(FIELDS.ROOMS)}`;
+    const url = `${ZOHO_CONFIG.ROOMS_ENDPOINT}/${filters.id}`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Zoho-oauthtoken ${token}`,

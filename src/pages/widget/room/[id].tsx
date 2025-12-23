@@ -20,7 +20,8 @@ export default function RoomWidgetPage() {
       try {
         const res = await fetch(`/api/rooms?id=${id}`);
         if (!res.ok) {
-          throw new Error("Error al cargar la habitación");
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "Error al cargar la habitación");
         }
         const data = await res.json();
         if (data.rooms && data.rooms.length > 0) {
@@ -86,7 +87,6 @@ export default function RoomWidgetPage() {
                 className="h-full w-full object-cover"
                 onError={() => setImgSrc("/placeholder.jpg")}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-white/50" />
             </div>
 
             {/* Content Section */}
@@ -147,39 +147,61 @@ export default function RoomWidgetPage() {
                   </div>
                 )}
 
-                {/* Features */}
-                {(room.features.length > 0 ||
-                  room.hasTerrace ||
-                  room.hasWasher) && (
+                {/* Characteristics */}
+                {room.detailedAmenities && (
                   <div className="mb-8">
                     <h3 className="text-sm font-bold uppercase tracking-widest text-[#c5b38b] mb-4">
-                      Comodidades
+                      Características
                     </h3>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                      {room.hasTerrace && (
-                        <li className="flex items-center text-neutral-600 text-sm">
-                          <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#c5b38b]"></span>
-                          Terraza/Balcón
-                        </li>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-1">
+                      {Object.entries(room.detailedAmenities).map(
+                        ([label, value]) => (
+                          <div
+                            key={label}
+                            className="flex justify-between items-center py-2 border-b border-neutral-100 text-sm"
+                          >
+                            <span className="text-neutral-500">{label}</span>
+                            <span className="font-medium text-neutral-800 text-right ml-4">
+                              {value}
+                            </span>
+                          </div>
+                        )
                       )}
-                      {room.hasWasher && (
-                        <li className="flex items-center text-neutral-600 text-sm">
-                          <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#c5b38b]"></span>
-                          Lavadora
-                        </li>
-                      )}
-                      {room.features.map((feature, index) => (
-                        <li
-                          key={index}
-                          className="flex items-center text-neutral-600 text-sm"
-                        >
-                          <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#c5b38b]"></span>
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
+
+                {/* Features */}
+                {(() => {
+                  const displayFeatures = Array.from(
+                    new Set([
+                      ...room.features,
+                      ...(room.hasTerrace ? ["Terraza"] : []),
+                      ...(room.hasWasher ? ["Lavadora"] : []),
+                    ])
+                  ).sort();
+
+                  if (displayFeatures.length === 0) return null;
+
+                  return (
+                    <div className="mb-8">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-[#c5b38b] mb-4">
+                        Comodidades
+                      </h3>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                        {displayFeatures.map((feature, index) => (
+                          <li
+                            key={index}
+                            className="flex items-center text-neutral-600 text-sm"
+                          >
+                            <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#c5b38b]"></span>
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Action Button */}
