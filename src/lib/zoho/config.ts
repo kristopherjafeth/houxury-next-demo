@@ -15,7 +15,7 @@ export const FIELDS = {
   PROPERTIES:
     "Name,url_featured_image,slugwordpress,number_of_rooms,bathroom_quantity,property_type,Property_Type,city,price_night,Size_sqm,features,Start_of_Availability,End_of_Availability,Has_Terrace,Has_Washer",
   ROOMS:
-    "Name,Record_Image,url_featured_image,Inmueble_Principal,slugwordpress",
+    "Name,Record_Image,url_featured_image,Inmueble_Principal,slugwordpress,price_night,bathroom_quantity,square_meters,features,description,Has_Terrace,Has_Washer",
   RESERVATIONS: "Check_in,Check_out,reservation_date,room_reserved",
 };
 

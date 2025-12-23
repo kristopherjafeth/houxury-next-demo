@@ -34,11 +34,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room }) => {
     // Send message to parent window (WordPress) to open modal
     const message = {
       action: "OPEN_RESERVATION_MODAL",
-      room: {
-        id: room.id,
-        name: room.name,
-        propertyName: room.propertyName,
-      },
+      roomId: room.id,
     };
 
     console.log("Sending message to parent:", message);

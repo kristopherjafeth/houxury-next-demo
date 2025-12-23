@@ -21,6 +21,8 @@ export type ZohoRoom = {
   squareMeters: number | null;
   features: string[];
   description: string;
+  hasTerrace: boolean | null;
+  hasWasher: boolean | null;
 };
 
 const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
@@ -50,6 +52,11 @@ const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
   const description =
     typeof record.description === "string" ? record.description : "";
 
+  const hasTerrace =
+    typeof record.Has_Terrace === "boolean" ? record.Has_Terrace : null;
+  const hasWasher =
+    typeof record.Has_Washer === "boolean" ? record.Has_Washer : null;
+
   return {
     id: record.id,
     name,
@@ -62,17 +69,24 @@ const mapRecordToRoom = (record: ZohoRecord): ZohoRoom => {
     squareMeters,
     features: featureList,
     description,
+    hasTerrace,
+    hasWasher,
   };
 };
 
 export type ZohoRoomFilters = {
   propertyId?: string | null;
   propertySlug?: string | null;
+  id?: string | null;
 };
 
 const buildRoomCriteria = (filters?: ZohoRoomFilters) => {
   if (!filters) return "";
   const parts: string[] = [];
+
+  if (filters.id) {
+    parts.push(`(id:equals:${filters.id})`);
+  }
 
   if (filters.propertyId) {
     parts.push(`(Inmueble_Principal.id:equals:${filters.propertyId})`);
