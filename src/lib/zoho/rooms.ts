@@ -104,6 +104,32 @@ const buildRoomCriteria = (filters?: ZohoRoomFilters) => {
 
 export const fetchZohoRooms = async (filters?: ZohoRoomFilters) => {
   const token = await fetchAccessToken();
+
+  if (filters?.id) {
+    const url = `${ZOHO_CONFIG.ROOMS_ENDPOINT}/${
+      filters.id
+    }?fields=${encodeURIComponent(FIELDS.ROOMS)}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Zoho-oauthtoken ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      // If 204 No Content (not found) or 404, return empty
+      if (response.status === 204 || response.status === 404) return [];
+
+      const text = await response.text();
+      throw new Error(
+        `No se pudo obtener la habitación: ${response.status} ${text}`
+      );
+    }
+
+    const payload: { data?: ZohoRecord[] } = await response.json();
+    const records = payload.data ?? [];
+    return records.map(mapRecordToRoom);
+  }
+
   const criteria = buildRoomCriteria(filters);
   const url = criteria
     ? `${ZOHO_CONFIG.ROOMS_ENDPOINT}?fields=${encodeURIComponent(

@@ -24,7 +24,9 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     // Filter rooms to only include those with a propertyId that matches the query parameter
     const filteredRooms = rooms.filter((room) => {
       // If filtering by specific room ID, return true directly (assuming fetchZohoRooms already filtered correctly)
-      if (idString && room.id === idString) return true;
+      if (idString) {
+        return room.id === idString;
+      }
 
       // Only include rooms that have a propertyId
       if (!room.propertyId) return false;

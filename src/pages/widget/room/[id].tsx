@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import type { ZohoRoom } from "../../../lib/zoho";
-import RoomCard from "../../../components/RoomCard";
 
 export default function RoomWidgetPage() {
   const router = useRouter();
