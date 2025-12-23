@@ -31,10 +31,18 @@ const RoomCard: React.FC<RoomCardProps> = ({ room }) => {
   const hasStats = stats.some((stat) => stat.value);
 
   const handleReserve = () => {
-    // Aquí puedes agregar la lógica de reserva
-    console.log("Reservar habitación:", room.id);
-    // Por ejemplo, redirigir a una página de reserva o abrir un modal
-    // window.open(reservationUrl, '_blank')
+    // Send message to parent window (WordPress) to open modal
+    const message = {
+      action: "OPEN_RESERVATION_MODAL",
+      room: {
+        id: room.id,
+        name: room.name,
+        propertyName: room.propertyName,
+      },
+    };
+
+    console.log("Sending message to parent:", message);
+    window.parent.postMessage(message, "*");
   };
 
   return (
