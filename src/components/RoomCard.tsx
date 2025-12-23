@@ -8,11 +8,12 @@ type RoomCardProps = {
 };
 
 const RoomCard: React.FC<RoomCardProps> = ({ room }) => {
+  console.log(room);
   const [imgSrc, setImgSrc] = useState(room.imageUrl);
   const [errored, setErrored] = useState(false);
 
   const handleImageError = () => {
-    if (!errored) {
+    if (!errored && !room.imageUrl) {
       setImgSrc(DEFAULT_PROPERTY_VALUES.imageUrl);
       setErrored(true);
     }
