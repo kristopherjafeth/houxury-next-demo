@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "previewengine-accl.zoho.eu",
+        hostname: "**.zoho.eu",
       },
     ],
   },
